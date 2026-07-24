@@ -14,4 +14,4 @@
 - Each script must exit cleanly (exit 0) on all non-blocking paths
 - PreToolUse scripts exit 2 to block a tool call, 0 to allow
 - Hook output must be valid JSON on stdout: `systemMessage`, `hookSpecificOutput`, or `{"decision":"block","reason":"..."}`
-- `systemMessage` for user-visible warnings; `additionalContext` for advisory context only
+- `systemMessage` for user-visible warnings; `additionalContext` for advisory context only (nested as `hookSpecificOutput.additionalContext`, not a top-level key)
