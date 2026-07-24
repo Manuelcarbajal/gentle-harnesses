@@ -56,7 +56,7 @@ def ensure_gga(cwd: str) -> str:
     try:
         r = subprocess.run(
             "gga install", shell=True,
-            capture_output=True, text=True, timeout=5, cwd=cwd,
+            capture_output=True, text=True, timeout=2, cwd=cwd,
             encoding="utf-8", errors="replace"
         )
         if r.returncode != 0:
@@ -64,6 +64,33 @@ def ensure_gga(cwd: str) -> str:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return ""
     return ""
+
+
+def load_session_snapshot(cwd: str) -> str:
+    if not shutil.which("engram"):
+        return ""
+    project = os.path.basename(cwd.rstrip("/\\")) if cwd else ""
+    if not project:
+        return ""
+    try:
+        r = subprocess.run(
+            ["engram", "search", f"session-end:{project}", "--limit", "1"],  # tag produced by session-stop.py
+            capture_output=True, text=True, timeout=2,
+            encoding="utf-8", errors="replace"
+        )
+        if r.returncode != 0 or not r.stdout.strip():
+            return ""
+        try:
+            data = json.loads(r.stdout.strip())
+            entries = data if isinstance(data, list) else data.get("results", data.get("entries", []))
+            if entries and isinstance(entries, list):
+                e = entries[0]
+                return e.get("content", e.get("body", ""))[:2000]
+            return ""
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return r.stdout.strip()[:2000]
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return ""
 
 
 def check_codegraph_mcp() -> str:
@@ -89,6 +116,7 @@ doctor_failures = check_doctor()
 codegraph_bin_err = check_codegraph_binary()
 codegraph_mcp_err = check_codegraph_mcp()
 gga_err = ensure_gga(project_dir) if project_dir else ""
+snapshot = load_session_snapshot(project_dir) if project_dir else ""
 
 issues = []
 if version_err:
@@ -110,9 +138,13 @@ if issues:
         )
     }))
 else:
+    ctx = f"gentle-ai {version} — ecosystem healthy"
+    if snapshot:
+        project_name = os.path.basename(project_dir.rstrip("/\\"))
+        ctx += f"\n\n---\n\n## Last session ({project_name})\n{snapshot}"
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",
-            "additionalContext": f"gentle-ai {version} — ecosystem healthy"
+            "additionalContext": ctx
         }
     }))
