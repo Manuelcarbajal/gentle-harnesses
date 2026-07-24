@@ -1,0 +1,9 @@
+{
+  "name": "gentle-claude",
+  "description": "gentle-ai ecosystem for Claude Code: skill registry injection, review lifecycle hooks, and ecosystem health checks.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Manuel Carbajal"
+  },
+  "license": "MIT"
+}
