@@ -5,6 +5,7 @@ Verifies: gentle-ai binary, ecosystem health, codegraph binary, codegraph MCP co
 """
 import json
 import pathlib
+import shutil
 import subprocess
 
 
@@ -37,10 +38,9 @@ def check_doctor() -> list[str]:
 
 
 def check_codegraph_binary() -> str:
-    code, _, err = run(["codegraph", "--version"])
-    if code != 0:
-        return f"codegraph binary not in PATH — install via `gentle-ai sync` or https://github.com/Gentleman-Programming/gentle-ai"
-    return ""
+    if shutil.which("codegraph"):
+        return ""
+    return "codegraph binary not in PATH — install via gentle-ai (community-tool:codegraph)"
 
 
 def check_codegraph_mcp() -> str:
