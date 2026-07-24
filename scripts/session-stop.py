@@ -50,10 +50,10 @@ if out:
 # ── 2. Session snapshot → Engram ────────────────────────────────────────────
 
 def sdd_snapshot() -> str:
-    _, out = run(["gentle-ai", "sdd-status"], timeout=5)
+    _, out = run(["gentle-ai", "sdd-status"], timeout=2)
     if not out:
         return ""
-    match = re.search(r"```json\s*(\{.*?\})\s*```", out, re.DOTALL)
+    match = re.search(r"```json\s*(.*?)\s*```", out, re.DOTALL)
     if not match:
         return ""
     try:
@@ -69,14 +69,14 @@ def sdd_snapshot() -> str:
 
 
 def git_snapshot() -> str:
-    _, log = run(["git", "-C", cwd, "log", "--oneline", "-3"], timeout=5)
+    _, log = run(["git", "-C", cwd, "log", "--oneline", "-3"], timeout=2)
     return log or ""
 
 
 def review_snapshot() -> str:
     if gate_msg:
         return gate_msg
-    _, out = run(["gentle-ai", "review", "status", "--cwd", cwd], timeout=5)
+    _, out = run(["gentle-ai", "review", "status", "--cwd", cwd], timeout=2)
     if not out:
         return ""
     try:
@@ -97,7 +97,7 @@ if parts:
     run(
         ["engram", "save", f"session-end:{project}", summary,
          "--type", "project", "--project", project],
-        timeout=8
+        timeout=3
     )
 
 # ── 3. Output ───────────────────────────────────────────────────────────────

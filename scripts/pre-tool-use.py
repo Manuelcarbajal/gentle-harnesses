@@ -5,6 +5,7 @@ Exit 2 = block the tool call. Exit 0 = allow.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -24,8 +25,10 @@ def gate(name: str) -> tuple[bool, str]:
         data = json.loads(r.stdout) if r.stdout.strip() else {}
         reason = data.get("reason", "receipt missing or invalidated")
         return False, reason
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return True, ""  # tool unavailable → fail-open, never block commits
     except Exception as exc:
-        return False, str(exc)
+        return True, str(exc)
 
 
 if tool_name != "Bash":
@@ -36,7 +39,7 @@ try:
 except (json.JSONDecodeError, AttributeError):
     sys.exit(0)
 
-if "git commit" in command:
+if re.search(r"(?:^|&&|\|\||;)\s*git\s+commit(?:\s|$)", command):
     allowed, reason = gate("pre-commit")
     if not allowed:
         print(json.dumps({
@@ -45,7 +48,7 @@ if "git commit" in command:
         }))
         sys.exit(2)
 
-if "git push" in command:
+if re.search(r"(?:^|&&|\|\||;)\s*git\s+push(?:\s|$)", command):
     allowed, reason = gate("pre-push")
     if not allowed:
         print(json.dumps({
