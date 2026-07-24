@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Stop hook: attempts gentle-ai review validate --gate post-apply.
-- Receipt exists and matches  → systemMessage confirming allow
-- Receipt missing             → silent (no review was run this session, normal)
-- Scope changed / invalidated → systemMessage warning with action hint
+Stop hook:
+1. Validates gentle-ai review gate post-apply.
+2. Saves session snapshot to Engram so next session resumes with context.
 """
 import json
 import os
+import re
 import subprocess
 
 
@@ -20,40 +20,89 @@ def run(cmd: list[str], timeout: int = 10) -> tuple[int, str]:
 
 cwd = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
 
+# ── 1. Review gate ──────────────────────────────────────────────────────────
+
 code, out = run(["gentle-ai", "review", "validate", "--gate", "post-apply", "--cwd", cwd])
+gate_msg = None
 
-if not out:
-    raise SystemExit(0)
+if out:
+    try:
+        data = json.loads(out)
+        allowed = data.get("allowed", False)
+        reason = data.get("reason", "")
+        denial_code = data.get("context", {}).get("denial", {}).get("code", "")
 
-try:
-    data = json.loads(out)
-except (json.JSONDecodeError, ValueError):
-    raise SystemExit(0)
+        if allowed:
+            lineage = data.get("context", {}).get("lineage_id", "")
+            tag = f" ({lineage})" if lineage else ""
+            gate_msg = f"review gate: allow{tag} — {reason}"
+        elif denial_code != "receipt_missing":
+            hints = {
+                "candidate-or-paths-mismatch": "scope changed — run review cycle again",
+                "invalidated":                 "receipt invalidated — explicit maintainer action required",
+                "authority_corrupted":         "run `gentle-ai review status` to diagnose",
+            }
+            hint = hints.get(denial_code, f"code={denial_code}")
+            gate_msg = f"⚠️  review gate: {data.get('result','')} — {hint or reason}"
+    except (json.JSONDecodeError, ValueError):
+        pass
 
-result = data.get("result", "")
-allowed = data.get("allowed", False)
-reason = data.get("reason", "")
-denial = data.get("context", {}).get("denial", {})
-denial_code = denial.get("code", "")
+# ── 2. Session snapshot → Engram ────────────────────────────────────────────
 
-if allowed:
-    lineage = data.get("context", {}).get("lineage_id", "")
-    tag = f" ({lineage})" if lineage else ""
-    print(json.dumps({
-        "systemMessage": f"✅ review gate: allow{tag} — {reason}"
-    }))
+def sdd_snapshot() -> str:
+    _, out = run(["gentle-ai", "sdd-status"], timeout=5)
+    if not out:
+        return ""
+    match = re.search(r"```json\s*(\{.*?\})\s*```", out, re.DOTALL)
+    if not match:
+        return ""
+    try:
+        d = json.loads(match.group(1))
+        change = d.get("changeName")
+        if not change:
+            return ""
+        next_rec = d.get("nextRecommended", "")
+        prog = d.get("taskProgress", {})
+        return f"sdd:{change} next:{next_rec} tasks:{prog.get('completed',0)}/{prog.get('total',0)}"
+    except Exception:
+        return ""
 
-elif denial_code == "receipt_missing":
-    raise SystemExit(0)
 
-else:
-    action_hints = {
-        "candidate-or-paths-mismatch": "scope changed — run review cycle again on current state",
-        "invalidated":                 "receipt invalidated — explicit maintainer action required",
-        "authority_corrupted":         "authority corrupted — run `gentle-ai review status` to diagnose",
-        "receipt_missing":             "",
-    }
-    hint = action_hints.get(denial_code, f"code={denial_code}")
-    print(json.dumps({
-        "systemMessage": f"⚠️  review gate: {result} — {hint or reason}"
-    }))
+def git_snapshot() -> str:
+    _, log = run(["git", "-C", cwd, "log", "--oneline", "-3"], timeout=5)
+    return log or ""
+
+
+def review_snapshot() -> str:
+    if gate_msg:
+        return gate_msg
+    _, out = run(["gentle-ai", "review", "status", "--cwd", cwd], timeout=5)
+    if not out:
+        return ""
+    try:
+        entries = json.loads(out).get("entries", [])
+        if entries:
+            e = entries[0]
+            return f"review:{e.get('lineage_id','')} state:{e.get('state','')}"
+    except Exception:
+        pass
+    return ""
+
+
+project = os.path.basename(cwd.rstrip("/\\"))
+parts = [x for x in [sdd_snapshot(), review_snapshot(), git_snapshot()] if x]
+
+if parts:
+    summary = " | ".join(parts)
+    run(
+        ["engram", "save", f"session-end:{project}", summary,
+         "--type", "project", "--project", project],
+        timeout=8
+    )
+
+# ── 3. Output ───────────────────────────────────────────────────────────────
+
+if gate_msg and gate_msg.startswith("⚠️"):
+    print(json.dumps({"systemMessage": gate_msg}))
+elif gate_msg:
+    print(json.dumps({"systemMessage": f"✅ {gate_msg}"}))
