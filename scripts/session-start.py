@@ -4,6 +4,7 @@ SessionStart health check for the gentle-ai + Claude Code ecosystem.
 Verifies: gentle-ai binary, ecosystem health, codegraph binary, codegraph MCP config.
 """
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -43,6 +44,28 @@ def check_codegraph_binary() -> str:
     return "codegraph binary not in PATH — install via gentle-ai (community-tool:codegraph)"
 
 
+def ensure_gga(cwd: str) -> str:
+    if not shutil.which("gga"):
+        return ""
+    git_dir = pathlib.Path(cwd) / ".git"
+    if not git_dir.exists():
+        return ""
+    hook = git_dir / "hooks" / "pre-commit"
+    if hook.exists() and "gga" in hook.read_text(encoding="utf-8", errors="ignore"):
+        return ""
+    try:
+        r = subprocess.run(
+            "gga install", shell=True,
+            capture_output=True, text=True, timeout=5, cwd=cwd,
+            encoding="utf-8", errors="replace"
+        )
+        if r.returncode != 0:
+            return f"gga install failed: {r.stderr.strip()}"
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return ""
+    return ""
+
+
 def check_codegraph_mcp() -> str:
     settings_path = pathlib.Path.home() / ".claude" / "settings.json"
     try:
@@ -59,10 +82,13 @@ def check_codegraph_mcp() -> str:
     return ""
 
 
+project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
+
 version, version_err = check_version()
 doctor_failures = check_doctor()
 codegraph_bin_err = check_codegraph_binary()
 codegraph_mcp_err = check_codegraph_mcp()
+gga_err = ensure_gga(project_dir) if project_dir else ""
 
 issues = []
 if version_err:
@@ -72,6 +98,8 @@ if codegraph_bin_err:
     issues.append(codegraph_bin_err)
 if codegraph_mcp_err:
     issues.append(codegraph_mcp_err)
+if gga_err:
+    issues.append(gga_err)
 
 if issues:
     bullet_list = "\n".join(f"  • {i}" for i in issues)

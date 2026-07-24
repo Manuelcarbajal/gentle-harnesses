@@ -52,7 +52,7 @@ def get_sdd_status(cwd: str) -> str:
             return ""
 
         # extract JSON block from markdown output
-        match = re.search(r"```json\s*(\{.*?\})\s*```", result.stdout, re.DOTALL)
+        match = re.search(r"```json\s*(.*?)\s*```", result.stdout, re.DOTALL)
         if not match:
             return ""
 
@@ -83,6 +83,18 @@ def get_sdd_status(cwd: str) -> str:
 registry = read_skill_registry(project_dir)
 review = get_review_status(project_dir)
 sdd = get_sdd_status(project_dir)
+
+# review pending → systemMessage so no agent can treat it as passive metadata
+review_pending = review and "next=review.start" in review
+if review_pending:
+    print(json.dumps({
+        "systemMessage": (
+            "⚠️  REVIEW REQUIRED — no valid receipt for this workspace.\n"
+            "Run `gentle-ai review start --cwd .` before any git commit or push.\n"
+            "git commit and git push are blocked until the review cycle completes."
+        )
+    }))
+    sys.exit(0)
 
 parts = []
 if registry:
