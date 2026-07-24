@@ -20,14 +20,14 @@ def run(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
 
 
 def check_version() -> tuple[str, str]:
-    code, out, err = run(["gentle-ai", "--version"])
+    code, out, err = run(["gentle-ai", "--version"], timeout=3)
     if code == 0 and out:
         return out.replace("gentle-ai ", "").strip(), ""
     return "", err or "gentle-ai not found"
 
 
 def check_doctor() -> list[str]:
-    code, out, _ = run(["gentle-ai", "doctor"], timeout=15)
+    code, out, _ = run(["gentle-ai", "doctor"], timeout=12)
     if code != 0 or not out:
         return ["gentle-ai doctor failed"]
     return [

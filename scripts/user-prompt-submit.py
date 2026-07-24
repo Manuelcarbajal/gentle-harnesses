@@ -68,12 +68,12 @@ def get_sdd_status(cwd: str) -> str:
         total = progress.get("total", 0)
         completed = progress.get("completed", 0)
         deps = data.get("dependencies", {})
-        active_phase = next((k for k, v in deps.items() if v == "ready"), next_rec)
+        ready_phase = next((k for k, v in deps.items() if v == "ready"), None)
 
         return (
             f"change: {change}\n"
-            f"phase: {active_phase}\n"
-            f"tasks: {completed}/{total}\n"
+            + (f"phase: {ready_phase}\n" if ready_phase else "")
+            + f"tasks: {completed}/{total}\n"
             f"next: {next_rec}"
         )
     except Exception:
