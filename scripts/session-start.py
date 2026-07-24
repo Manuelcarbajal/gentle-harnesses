@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
 SessionStart health check for the gentle-ai + Claude Code ecosystem.
-Runs gentle-ai doctor and verifies the context injection hook still works.
-Outputs systemMessage on failure, additionalContext with version on success.
+Verifies: gentle-ai binary, ecosystem health, codegraph binary, codegraph MCP config.
 """
 import json
-import os
+import pathlib
 import subprocess
-import sys
+
 
 def run(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
     try:
@@ -18,55 +17,68 @@ def run(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
     except FileNotFoundError:
         return 1, "", f"{cmd[0]}: not found"
 
+
 def check_version() -> tuple[str, str]:
     code, out, err = run(["gentle-ai", "--version"])
     if code == 0 and out:
         return out.replace("gentle-ai ", "").strip(), ""
     return "", err or "gentle-ai not found"
 
+
 def check_doctor() -> list[str]:
     code, out, _ = run(["gentle-ai", "doctor"], timeout=15)
     if code != 0 or not out:
         return ["gentle-ai doctor failed"]
-    failures = []
-    for line in out.splitlines():
-        if line.strip().startswith("[fail]"):
-            failures.append(line.strip())
-    return failures
+    return [
+        line.strip()
+        for line in out.splitlines()
+        if line.strip().startswith("[fail]")
+    ]
 
-def check_context_hook() -> str:
-    script = os.path.join(os.path.dirname(__file__), "gentle-ai-context.py")
-    if not os.path.exists(script):
-        return f"gentle-ai-context.py not found at {script}"
-    code, out, err = run(["python", script], timeout=10)
+
+def check_codegraph_binary() -> str:
+    code, _, err = run(["codegraph", "--version"])
     if code != 0:
-        return f"gentle-ai-context.py exited {code}: {err or out}"
-    try:
-        data = json.loads(out)
-        if "hookSpecificOutput" not in data and out:
-            return "gentle-ai-context.py output missing hookSpecificOutput"
-    except (json.JSONDecodeError, ValueError):
-        if out:
-            return f"gentle-ai-context.py produced invalid JSON"
+        return f"codegraph binary not in PATH — install via `gentle-ai sync` or https://github.com/Gentleman-Programming/gentle-ai"
     return ""
+
+
+def check_codegraph_mcp() -> str:
+    settings_path = pathlib.Path.home() / ".claude" / "settings.json"
+    try:
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+        if "codegraph" not in data.get("mcpServers", {}):
+            return (
+                'codegraph missing from ~/.claude/settings.json mcpServers — '
+                'add: {"command": "codegraph", "args": ["serve", "--mcp"]}'
+            )
+    except FileNotFoundError:
+        return "~/.claude/settings.json not found"
+    except (json.JSONDecodeError, ValueError) as exc:
+        return f"~/.claude/settings.json parse error: {exc}"
+    return ""
+
 
 version, version_err = check_version()
 doctor_failures = check_doctor()
-hook_err = check_context_hook()
+codegraph_bin_err = check_codegraph_binary()
+codegraph_mcp_err = check_codegraph_mcp()
 
 issues = []
 if version_err:
     issues.append(f"gentle-ai binary: {version_err}")
 issues.extend(doctor_failures)
-if hook_err:
-    issues.append(f"context hook: {hook_err}")
+if codegraph_bin_err:
+    issues.append(codegraph_bin_err)
+if codegraph_mcp_err:
+    issues.append(codegraph_mcp_err)
 
 if issues:
     bullet_list = "\n".join(f"  • {i}" for i in issues)
     print(json.dumps({
         "systemMessage": (
             f"⚠️  gentle-ai ecosystem issues detected:\n{bullet_list}\n"
-            f"Run `gentle-ai doctor` or `gentle-ai upgrade` to fix."
+            "Run `gentle-ai doctor` or `gentle-ai sync` to fix."
         )
     }))
 else:
