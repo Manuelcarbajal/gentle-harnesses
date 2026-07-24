@@ -6,6 +6,7 @@ Exit 2 = block the tool call. Exit 0 = allow.
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -14,11 +15,14 @@ tool_input = os.environ.get("CLAUDE_TOOL_INPUT", "{}")
 cwd = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
 
 
+_gentle_ai = shutil.which("gentle-ai") or "gentle-ai"
+
+
 def gate(name: str) -> tuple[bool, str]:
     try:
         r = subprocess.run(
-            ["gentle-ai", "review", "validate", "--gate", name, "--cwd", cwd],
-            capture_output=True, text=True, timeout=8
+            [_gentle_ai, "review", "validate", "--gate", name, "--cwd", cwd],
+            capture_output=True, text=True, timeout=4
         )
         if r.returncode == 0:
             return True, ""
