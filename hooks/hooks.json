@@ -1,5 +1,5 @@
 {
-  "description": "gentle-ai ecosystem hooks for Claude Code — health check, skill registry injection, and review gate validation",
+  "description": "gentle-ai ecosystem hooks for Claude Code — health check, skill registry injection, review gate validation, and pre-commit enforcement",
   "hooks": {
     "SessionStart": [
       {
@@ -28,6 +28,17 @@
           {
             "type": "command",
             "command": "python \"${CLAUDE_PLUGIN_ROOT}/scripts/user-prompt-submit.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/scripts/pre-tool-use.py\"",
             "timeout": 10
           }
         ]
