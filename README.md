@@ -1,4 +1,4 @@
-# gentle-claude
+# gentle-ai-claude
 
 A [Claude Code](https://claude.ai/code) plugin that wires the [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) ecosystem into your Claude sessions — health checks, skill registry injection, review lifecycle enforcement, and session continuity via Engram.
 
@@ -28,7 +28,8 @@ Optional but recommended:
 ## Installation
 
 ```bash
-claude plugin install --directory /path/to/gentle-claude
+git clone https://github.com/Manuelcarbajal/gentle-ai-claude.git
+claude plugin install --directory gentle-ai-claude
 ```
 
 Or add it to your `~/.claude/settings.json` directly:
@@ -41,7 +42,7 @@ Or add it to your `~/.claude/settings.json` directly:
   "extraKnownMarketplaces": {
     "gentle-claude": {
       "source": {
-        "path": "/path/to/gentle-claude",
+        "path": "/path/to/gentle-ai-claude",
         "source": "directory"
       }
     }
