@@ -109,42 +109,47 @@ def check_codegraph_mcp() -> str:
     return ""
 
 
-project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
+def main() -> None:
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
 
-version, version_err = check_version()
-doctor_failures = check_doctor()
-codegraph_bin_err = check_codegraph_binary()
-codegraph_mcp_err = check_codegraph_mcp()
-gga_err = ensure_gga(project_dir) if project_dir else ""
-snapshot = load_session_snapshot(project_dir) if project_dir else ""
+    version, version_err = check_version()
+    doctor_failures = check_doctor()
+    codegraph_bin_err = check_codegraph_binary()
+    codegraph_mcp_err = check_codegraph_mcp()
+    gga_err = ensure_gga(project_dir) if project_dir else ""
+    snapshot = load_session_snapshot(project_dir) if project_dir else ""
 
-issues = []
-if version_err:
-    issues.append(f"gentle-ai binary: {version_err}")
-issues.extend(doctor_failures)
-if codegraph_bin_err:
-    issues.append(codegraph_bin_err)
-if codegraph_mcp_err:
-    issues.append(codegraph_mcp_err)
-if gga_err:
-    issues.append(gga_err)
+    issues: list[str] = []
+    if version_err:
+        issues.append(f"gentle-ai binary: {version_err}")
+    issues.extend(doctor_failures)
+    if codegraph_bin_err:
+        issues.append(codegraph_bin_err)
+    if codegraph_mcp_err:
+        issues.append(codegraph_mcp_err)
+    if gga_err:
+        issues.append(gga_err)
 
-if issues:
-    bullet_list = "\n".join(f"  • {i}" for i in issues)
-    print(json.dumps({
-        "systemMessage": (
-            f"⚠️  gentle-ai ecosystem issues detected:\n{bullet_list}\n"
-            "Run `gentle-ai doctor` or `gentle-ai sync` to fix."
-        )
-    }))
-else:
-    ctx = f"gentle-ai {version} — ecosystem healthy"
-    if snapshot:
-        project_name = os.path.basename(project_dir.rstrip("/\\"))
-        ctx += f"\n\n---\n\n## Last session ({project_name})\n{snapshot}"
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "SessionStart",
-            "additionalContext": ctx
-        }
-    }))
+    if issues:
+        bullet_list = "\n".join(f"  • {i}" for i in issues)
+        print(json.dumps({
+            "systemMessage": (
+                f"⚠️  gentle-ai ecosystem issues detected:\n{bullet_list}\n"
+                "Run `gentle-ai doctor` or `gentle-ai sync` to fix."
+            )
+        }))
+    else:
+        ctx = f"gentle-ai {version} — ecosystem healthy"
+        if snapshot:
+            project_name = os.path.basename(project_dir.rstrip("/\\"))
+            ctx += f"\n\n---\n\n## Last session ({project_name})\n{snapshot}"
+        print(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": ctx
+            }
+        }))
+
+
+if __name__ == "__main__":
+    main()

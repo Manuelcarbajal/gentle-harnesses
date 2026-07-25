@@ -18,14 +18,10 @@ def run(cmd: list[str], timeout: int = 10) -> tuple[int, str]:
         return 1, ""
 
 
-cwd = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
-
-# ── 1. Review gate ──────────────────────────────────────────────────────────
-
-code, out = run(["gentle-ai", "review", "validate", "--gate", "post-apply", "--cwd", cwd])
-gate_msg = None
-
-if out:
+def build_gate_msg(cwd: str) -> str:
+    _, out = run(["gentle-ai", "review", "validate", "--gate", "post-apply", "--cwd", cwd])
+    if not out:
+        return ""
     try:
         data = json.loads(out)
         allowed = data.get("allowed", False)
@@ -35,21 +31,21 @@ if out:
         if allowed:
             lineage = data.get("context", {}).get("lineage_id", "")
             tag = f" ({lineage})" if lineage else ""
-            gate_msg = f"review gate: allow{tag} — {reason}"
-        elif denial_code != "receipt_missing":
+            return f"review gate: allow{tag} — {reason}"
+        if denial_code != "receipt_missing":
             hints = {
                 "candidate-or-paths-mismatch": "scope changed — run review cycle again",
                 "invalidated":                 "receipt invalidated — explicit maintainer action required",
                 "authority_corrupted":         "run `gentle-ai review status` to diagnose",
             }
             hint = hints.get(denial_code, f"code={denial_code}")
-            gate_msg = f"⚠️  review gate: {data.get('result','')} — {hint or reason}"
+            return f"⚠️  review gate: {data.get('result','')} — {hint or reason}"
     except (json.JSONDecodeError, ValueError):
         pass
+    return ""
 
-# ── 2. Session snapshot → Engram ────────────────────────────────────────────
 
-def sdd_snapshot() -> str:
+def sdd_snapshot(cwd: str) -> str:
     _, out = run(["gentle-ai", "sdd-status"], timeout=2)
     if not out:
         return ""
@@ -68,12 +64,12 @@ def sdd_snapshot() -> str:
         return ""
 
 
-def git_snapshot() -> str:
+def git_snapshot(cwd: str) -> str:
     _, log = run(["git", "-C", cwd, "log", "--oneline", "-3"], timeout=2)
     return log or ""
 
 
-def review_snapshot() -> str:
+def review_snapshot(cwd: str, gate_msg: str) -> str:
     if gate_msg:
         return gate_msg
     _, out = run(["gentle-ai", "review", "status", "--cwd", cwd], timeout=2)
@@ -89,20 +85,27 @@ def review_snapshot() -> str:
     return ""
 
 
-project = os.path.basename(cwd.rstrip("/\\"))
-parts = [x for x in [sdd_snapshot(), review_snapshot(), git_snapshot()] if x]
+def main() -> None:
+    cwd = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
 
-if parts:
-    summary = " | ".join(parts)
-    run(
-        ["engram", "save", f"session-end:{project}", summary,
-         "--type", "project", "--project", project],
-        timeout=3
-    )
+    gate_msg = build_gate_msg(cwd)
 
-# ── 3. Output ───────────────────────────────────────────────────────────────
+    project = os.path.basename(cwd.rstrip("/\\"))
+    parts = [x for x in [sdd_snapshot(cwd), review_snapshot(cwd, gate_msg), git_snapshot(cwd)] if x]
 
-if gate_msg and gate_msg.startswith("⚠️"):
-    print(json.dumps({"systemMessage": gate_msg}))
-elif gate_msg:
-    print(json.dumps({"systemMessage": f"✅ {gate_msg}"}))
+    if parts:
+        summary = " | ".join(parts)
+        run(
+            ["engram", "save", f"session-end:{project}", summary,
+             "--type", "project", "--project", project],
+            timeout=3
+        )
+
+    if gate_msg and gate_msg.startswith("⚠️"):
+        print(json.dumps({"systemMessage": gate_msg}))
+    elif gate_msg:
+        print(json.dumps({"systemMessage": f"✅ {gate_msg}"}))
+
+
+if __name__ == "__main__":
+    main()

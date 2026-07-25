@@ -9,9 +9,6 @@ import re
 import subprocess
 import sys
 
-project_dir = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
-
-
 def read_skill_registry(cwd: str) -> str:
     path = os.path.join(cwd, ".atl", "skill-registry.md")
     try:
@@ -80,36 +77,44 @@ def get_sdd_status(cwd: str) -> str:
         return ""
 
 
-registry = read_skill_registry(project_dir)
-review = get_review_status(project_dir)
-sdd = get_sdd_status(project_dir)
+def main() -> None:
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
 
-# review pending → systemMessage so no agent can treat it as passive metadata
-review_pending = review and "next=review.start" in review
-if review_pending:
+    registry = read_skill_registry(project_dir)
+    review = get_review_status(project_dir)
+    sdd = get_sdd_status(project_dir)
+
+    review_pending = review and "next=review.start" in review
+    if review_pending:
+        print(json.dumps({
+            "systemMessage": (
+                "⚠️  REVIEW REQUIRED — no valid receipt for this workspace.\n"
+                "Run `gentle-ai review start --cwd .` before any git commit or push.\n"
+                "git commit and git push are blocked until the review cycle completes."
+            )
+        }))
+        sys.exit(0)
+        return
+
+    parts = []
+    if registry:
+        parts.append(f"## Gentle-AI Skill Registry\n\n{registry}")
+    if review:
+        parts.append(f"## Review Lifecycle\n\n{review}")
+    if sdd:
+        parts.append(f"## SDD Status\n\n{sdd}")
+
+    if not parts:
+        sys.exit(0)
+        return
+
     print(json.dumps({
-        "systemMessage": (
-            "⚠️  REVIEW REQUIRED — no valid receipt for this workspace.\n"
-            "Run `gentle-ai review start --cwd .` before any git commit or push.\n"
-            "git commit and git push are blocked until the review cycle completes."
-        )
+        "hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": "\n\n---\n\n".join(parts)
+        }
     }))
-    sys.exit(0)
 
-parts = []
-if registry:
-    parts.append(f"## Gentle-AI Skill Registry\n\n{registry}")
-if review:
-    parts.append(f"## Review Lifecycle\n\n{review}")
-if sdd:
-    parts.append(f"## SDD Status\n\n{sdd}")
 
-if not parts:
-    sys.exit(0)
-
-print(json.dumps({
-    "hookSpecificOutput": {
-        "hookEventName": "UserPromptSubmit",
-        "additionalContext": "\n\n---\n\n".join(parts)
-    }
-}))
+if __name__ == "__main__":
+    main()

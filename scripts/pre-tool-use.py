@@ -10,15 +10,10 @@ import shutil
 import subprocess
 import sys
 
-tool_name = os.environ.get("CLAUDE_TOOL_NAME", "")
-tool_input = os.environ.get("CLAUDE_TOOL_INPUT", "{}")
-cwd = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
-
-
 _gentle_ai = shutil.which("gentle-ai") or "gentle-ai"
 
 
-def gate(name: str) -> tuple[bool, str]:
+def gate(name: str, cwd: str) -> tuple[bool, str]:
     try:
         r = subprocess.run(
             [_gentle_ai, "review", "validate", "--gate", name, "--cwd", cwd],
@@ -35,30 +30,43 @@ def gate(name: str) -> tuple[bool, str]:
         return True, str(exc)
 
 
-if tool_name != "Bash":
+def main() -> None:
+    tool_name = os.environ.get("CLAUDE_TOOL_NAME", "")
+    tool_input = os.environ.get("CLAUDE_TOOL_INPUT", "{}")
+    cwd = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
+
+    if tool_name != "Bash":
+        sys.exit(0)
+        return
+
+    try:
+        command = json.loads(tool_input).get("command", "")
+    except (json.JSONDecodeError, AttributeError):
+        sys.exit(0)
+        return
+
+    if re.search(r"(?:^|&&|\|\||;)\s*git\s+commit(?:\s|$)", command):
+        allowed, reason = gate("pre-commit", cwd)
+        if not allowed:
+            print(json.dumps({
+                "decision": "block",
+                "reason": f"review gate denied: {reason} — run the review cycle first (gentle-ai review start)"
+            }))
+            sys.exit(2)
+            return
+
+    if re.search(r"(?:^|&&|\|\||;)\s*git\s+push(?:\s|$)", command):
+        allowed, reason = gate("pre-push", cwd)
+        if not allowed:
+            print(json.dumps({
+                "decision": "block",
+                "reason": f"review gate denied: {reason} — run the review cycle first (gentle-ai review start)"
+            }))
+            sys.exit(2)
+            return
+
     sys.exit(0)
 
-try:
-    command = json.loads(tool_input).get("command", "")
-except (json.JSONDecodeError, AttributeError):
-    sys.exit(0)
 
-if re.search(r"(?:^|&&|\|\||;)\s*git\s+commit(?:\s|$)", command):
-    allowed, reason = gate("pre-commit")
-    if not allowed:
-        print(json.dumps({
-            "decision": "block",
-            "reason": f"review gate denied: {reason} — run the review cycle first (gentle-ai review start)"
-        }))
-        sys.exit(2)
-
-if re.search(r"(?:^|&&|\|\||;)\s*git\s+push(?:\s|$)", command):
-    allowed, reason = gate("pre-push")
-    if not allowed:
-        print(json.dumps({
-            "decision": "block",
-            "reason": f"review gate denied: {reason} — run the review cycle first (gentle-ai review start)"
-        }))
-        sys.exit(2)
-
-sys.exit(0)
+if __name__ == "__main__":
+    main()
