@@ -8,7 +8,7 @@ Mirrors what [gentle-pi](https://github.com/Gentleman-Programming/gentle-pi) doe
 
 | Hook | Behavior |
 |---|---|
-| **SessionStart** | Checks gentle-ai binary, ecosystem health (`gentle-ai doctor`), codegraph binary, and codegraph MCP config. Auto-installs the GGA pre-commit hook if `gga` is available. Injects the last session snapshot from Engram as context. |
+| **SessionStart** | Checks gentle-ai binary, ecosystem health (`gentle-ai doctor`), and codegraph binary. Injects the last session snapshot from Engram as context. |
 | **UserPromptSubmit** | Refreshes the skill registry (`.atl/skill-registry.md`) and injects it as context. Adds review lifecycle status and active SDD phase on every prompt. Surfaces a blocking `systemMessage` when a review is required before committing. |
 | **PreToolUse** | Blocks `git commit` and `git push` when no valid review receipt exists for the current workspace. Fail-open: if `gentle-ai` is unavailable, commits are never blocked. |
 | **Stop** | Validates the review gate on session end. Saves a session summary to Engram under the key `session-end:{project}` for recovery at the next SessionStart. |
@@ -23,7 +23,7 @@ Optional but recommended:
 
 - [`codegraph`](https://github.com/Gentleman-Programming/codegraph) — structural code intelligence (checked at SessionStart)
 - [`engram`](https://github.com/Gentleman-Programming/engram) — session memory (snapshot injection and save)
-- [`gga`](https://github.com/Gentleman-Programming/gga) — Gentleman Guardian Angel pre-commit hook (auto-installed per repo)
+- [`gga`](https://github.com/Gentleman-Programming/gga) — Gentleman Guardian Angel pre-commit hook (run `gga install` once per repo to set it up)
 
 ## Installation
 

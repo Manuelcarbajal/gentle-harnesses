@@ -5,6 +5,9 @@ from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
 
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
 
 def load_script(name: str) -> types.ModuleType:
     """Load a hook script as a module without executing top-level code."""

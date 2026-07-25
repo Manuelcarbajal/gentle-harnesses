@@ -1,41 +1,21 @@
 #!/usr/bin/env python3
 """
 SessionStart health check for the gentle-ai + Claude Code ecosystem.
-Verifies: gentle-ai binary, ecosystem health, codegraph binary, codegraph MCP config.
+Verifies: gentle-ai binary, ecosystem health, codegraph binary.
 """
+import gentle_ai
 import json
 import os
-import pathlib
 import shutil
-import subprocess
-
-
-def run(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace")
-        return r.returncode, r.stdout.strip(), r.stderr.strip()
-    except subprocess.TimeoutExpired:
-        return 1, "", "timeout"
-    except FileNotFoundError:
-        return 1, "", f"{cmd[0]}: not found"
 
 
 def check_version() -> tuple[str, str]:
-    code, out, err = run(["gentle-ai", "--version"], timeout=3)
-    if code == 0 and out:
-        return out.replace("gentle-ai ", "").strip(), ""
-    return "", err or "gentle-ai not found"
+    v = gentle_ai.version()
+    return (v, "") if v else ("", "gentle-ai not found")
 
 
 def check_doctor() -> list[str]:
-    code, out, _ = run(["gentle-ai", "doctor"], timeout=5)
-    if code != 0 or not out:
-        return ["gentle-ai doctor failed"]
-    return [
-        line.strip()
-        for line in out.splitlines()
-        if line.strip().startswith("[fail]")
-    ]
+    return gentle_ai.doctor()
 
 
 def check_codegraph_binary() -> str:
@@ -44,71 +24,6 @@ def check_codegraph_binary() -> str:
     return "codegraph binary not in PATH — install via gentle-ai (community-tool:codegraph)"
 
 
-def ensure_gga(cwd: str) -> str:
-    gga_bin = shutil.which("gga")
-    if not gga_bin:
-        return ""
-    git_dir = pathlib.Path(cwd) / ".git"
-    if not git_dir.exists():
-        return ""
-    hook = git_dir / "hooks" / "pre-commit"
-    if hook.exists() and "gga" in hook.read_text(encoding="utf-8", errors="ignore"):
-        return ""
-    try:
-        r = subprocess.run(
-            [gga_bin, "install"],
-            capture_output=True, text=True, timeout=2, cwd=cwd,
-            encoding="utf-8", errors="replace"
-        )
-        if r.returncode != 0:
-            return f"gga install failed: {r.stderr.strip()}"
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return ""
-    return ""
-
-
-def load_session_snapshot(cwd: str) -> str:
-    if not shutil.which("engram"):
-        return ""
-    project = os.path.basename(cwd.rstrip("/\\")) if cwd else ""
-    if not project:
-        return ""
-    try:
-        r = subprocess.run(
-            ["engram", "search", f"session-end:{project}", "--limit", "1"],  # tag produced by session-stop.py
-            capture_output=True, text=True, timeout=2,
-            encoding="utf-8", errors="replace"
-        )
-        if r.returncode != 0 or not r.stdout.strip():
-            return ""
-        try:
-            data = json.loads(r.stdout.strip())
-            entries = data if isinstance(data, list) else data.get("results", data.get("entries", []))
-            if entries and isinstance(entries, list):
-                e = entries[0]
-                return e.get("content", e.get("body", ""))[:2000]
-            return ""
-        except (json.JSONDecodeError, TypeError, AttributeError):
-            return r.stdout.strip()[:2000]
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return ""
-
-
-def check_codegraph_mcp() -> str:
-    settings_path = pathlib.Path.home() / ".claude" / "settings.json"
-    try:
-        data = json.loads(settings_path.read_text(encoding="utf-8"))
-        if "codegraph" not in data.get("mcpServers", {}):
-            return (
-                'codegraph missing from ~/.claude/settings.json mcpServers — '
-                'add: {"command": "codegraph", "args": ["serve", "--mcp"]}'
-            )
-    except FileNotFoundError:
-        return "~/.claude/settings.json not found"
-    except (json.JSONDecodeError, ValueError) as exc:
-        return f"~/.claude/settings.json parse error: {exc}"
-    return ""
-
 
 def main() -> None:
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
@@ -116,9 +31,6 @@ def main() -> None:
     version, version_err = check_version()
     doctor_failures = check_doctor() if not version_err else []
     codegraph_bin_err = check_codegraph_binary()
-    codegraph_mcp_err = check_codegraph_mcp()
-    gga_err = ensure_gga(project_dir) if project_dir else ""
-    snapshot = load_session_snapshot(project_dir) if project_dir else ""
 
     issues: list[str] = []
     if version_err:
@@ -126,10 +38,6 @@ def main() -> None:
     issues.extend(doctor_failures)
     if codegraph_bin_err:
         issues.append(codegraph_bin_err)
-    if codegraph_mcp_err:
-        issues.append(codegraph_mcp_err)
-    if gga_err:
-        issues.append(gga_err)
 
     if issues:
         bullet_list = "\n".join(f"  • {i}" for i in issues)
@@ -140,14 +48,10 @@ def main() -> None:
             )
         }))
     else:
-        ctx = f"gentle-ai {version} — ecosystem healthy"
-        if snapshot:
-            project_name = os.path.basename(project_dir.rstrip("/\\"))
-            ctx += f"\n\n---\n\n## Last session ({project_name})\n{snapshot}"
         print(json.dumps({
             "hookSpecificOutput": {
                 "hookEventName": "SessionStart",
-                "additionalContext": ctx
+                "additionalContext": f"gentle-ai {version} — ecosystem healthy"
             }
         }))
 

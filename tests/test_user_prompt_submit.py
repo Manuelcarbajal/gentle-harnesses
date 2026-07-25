@@ -49,41 +49,9 @@ def test_get_review_status_command_fails() -> None:
     assert out == ""
 
 
-def test_get_review_status_exception_failopen() -> None:
-    with patch("subprocess.run", side_effect=Exception("boom")):
+def test_get_review_status_not_found_failopen() -> None:
+    with patch("subprocess.run", side_effect=FileNotFoundError):
         out = ups.get_review_status("/repo")
-    assert out == ""
-
-
-# ── get_sdd_status ────────────────────────────────────────────────────────────
-
-def test_get_sdd_status_active_change() -> None:
-    sdd_output = (
-        "Some text\n"
-        "```json\n"
-        '{"changeName":"my-change","nextRecommended":"apply","taskProgress":{"completed":1,"total":3},"dependencies":{"apply":"ready"}}\n'
-        "```\n"
-    )
-    result = MagicMock(returncode=0, stdout=sdd_output, stderr="")
-    with patch("subprocess.run", return_value=result):
-        out = ups.get_sdd_status("/repo")
-    assert "my-change" in out
-    assert "apply" in out
-    assert "1/3" in out
-
-
-def test_get_sdd_status_no_change() -> None:
-    sdd_output = '```json\n{"changeName":null}\n```'
-    result = MagicMock(returncode=0, stdout=sdd_output, stderr="")
-    with patch("subprocess.run", return_value=result):
-        out = ups.get_sdd_status("/repo")
-    assert out == ""
-
-
-def test_get_sdd_status_command_fails() -> None:
-    result = MagicMock(returncode=1, stdout="", stderr="")
-    with patch("subprocess.run", return_value=result):
-        out = ups.get_sdd_status("/repo")
     assert out == ""
 
 
@@ -94,7 +62,6 @@ def test_main_review_pending_outputs_system_message(monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/repo")
     monkeypatch.setattr(ups, "read_skill_registry", lambda cwd: "")
     monkeypatch.setattr(ups, "get_review_status", lambda cwd: "action=start next=review.start")
-    monkeypatch.setattr(ups, "get_sdd_status", lambda cwd: "")
 
     with patch.object(sys, "exit"):
         ups.main()
@@ -108,7 +75,6 @@ def test_main_injects_skill_registry(monkeypatch: pytest.MonkeyPatch, capsys: py
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/repo")
     monkeypatch.setattr(ups, "read_skill_registry", lambda cwd: "## Skills\n- sdd-apply")
     monkeypatch.setattr(ups, "get_review_status", lambda cwd: "action=commit next=pre-commit")
-    monkeypatch.setattr(ups, "get_sdd_status", lambda cwd: "")
 
     ups.main()
 
@@ -124,7 +90,6 @@ def test_main_no_context_exits_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/repo")
     monkeypatch.setattr(ups, "read_skill_registry", lambda cwd: "")
     monkeypatch.setattr(ups, "get_review_status", lambda cwd: "")
-    monkeypatch.setattr(ups, "get_sdd_status", lambda cwd: "")
 
     with patch.object(sys, "exit") as mock_exit:
         ups.main()
