@@ -1,0 +1,4 @@
+# GGA project config — overrides global settings for this repo.
+# Only review hook scripts; tests are covered by the gentle-ai 4R review cycle.
+
+EXCLUDE_PATTERNS="tests/*,*.test.*,*.spec.*,*.d.ts,dist/*,build/*,node_modules/*"

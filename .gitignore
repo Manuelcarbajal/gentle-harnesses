@@ -1,6 +1,10 @@
 # Local Pi runtime state
 .atl/
 
+# Review cycle temp files
+.tmp-*
+
 # Python
 __pycache__/
 *.pyc
+.pytest_cache/

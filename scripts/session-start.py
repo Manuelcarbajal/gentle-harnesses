@@ -12,7 +12,7 @@ import subprocess
 
 def run(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace")
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except subprocess.TimeoutExpired:
         return 1, "", "timeout"
@@ -28,7 +28,7 @@ def check_version() -> tuple[str, str]:
 
 
 def check_doctor() -> list[str]:
-    code, out, _ = run(["gentle-ai", "doctor"], timeout=12)
+    code, out, _ = run(["gentle-ai", "doctor"], timeout=5)
     if code != 0 or not out:
         return ["gentle-ai doctor failed"]
     return [
@@ -45,7 +45,8 @@ def check_codegraph_binary() -> str:
 
 
 def ensure_gga(cwd: str) -> str:
-    if not shutil.which("gga"):
+    gga_bin = shutil.which("gga")
+    if not gga_bin:
         return ""
     git_dir = pathlib.Path(cwd) / ".git"
     if not git_dir.exists():
@@ -55,7 +56,7 @@ def ensure_gga(cwd: str) -> str:
         return ""
     try:
         r = subprocess.run(
-            "gga install", shell=True,
+            [gga_bin, "install"],
             capture_output=True, text=True, timeout=2, cwd=cwd,
             encoding="utf-8", errors="replace"
         )
@@ -113,7 +114,7 @@ def main() -> None:
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
 
     version, version_err = check_version()
-    doctor_failures = check_doctor()
+    doctor_failures = check_doctor() if not version_err else []
     codegraph_bin_err = check_codegraph_binary()
     codegraph_mcp_err = check_codegraph_mcp()
     gga_err = ensure_gga(project_dir) if project_dir else ""

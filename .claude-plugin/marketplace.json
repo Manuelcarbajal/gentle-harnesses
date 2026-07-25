@@ -1,0 +1,14 @@
+{
+  "name": "gentle-claude",
+  "owner": {
+    "name": "Manuel Carbajal",
+    "url": "https://github.com/Manuelcarbajal"
+  },
+  "plugins": [
+    {
+      "name": "gentle-claude",
+      "source": ".",
+      "description": "gentle-ai ecosystem hooks for Claude Code: skill registry injection, review lifecycle enforcement, and session continuity via Engram."
+    }
+  ]
+}
