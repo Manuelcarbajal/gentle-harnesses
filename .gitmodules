@@ -1,0 +1,3 @@
+[submodule "vendor/gentle-pi"]
+	path = vendor/gentle-pi
+	url = https://github.com/Gentleman-Programming/gentle-pi.git
