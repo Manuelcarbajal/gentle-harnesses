@@ -92,7 +92,8 @@ inject_adapter_skills() {
 
     local header
     header="$(printf '\n\n## Adapter Skills\n\n| Skill | Trigger / description | Scope | Path |\n| --- | --- | --- | --- |')"
-    printf '%s%s\n%s%s' "$registry" "$header" "$plugin_rows" "$vendor_rows"
+    # $() strips trailing newlines — add explicit \n between sections
+    printf '%s%s\n%s\n%s\n' "$registry" "$header" "$plugin_rows" "$vendor_rows"
 }
 
 review_raw=$(gentle_ai_review_status "$CWD")
