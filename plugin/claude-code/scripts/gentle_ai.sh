@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
 gentle_ai_bin() {
+    local local_bin="${CLAUDE_PLUGIN_ROOT}/bin/gentle-ai"
+    if [ -x "$local_bin" ]; then
+        echo "$local_bin"
+        return 0
+    fi
     command -v gentle-ai 2>/dev/null || echo ""
 }
 

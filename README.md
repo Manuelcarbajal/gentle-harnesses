@@ -16,7 +16,9 @@ Mirrors what [gentle-pi](https://github.com/Gentleman-Programming/gentle-pi) doe
 ## Requirements
 
 - [Claude Code](https://claude.ai/code) — CLI or desktop app
-- [`gentle-ai`](https://github.com/Gentleman-Programming/gentle-ai) binary in PATH
+- [`gentle-ai`](https://github.com/Gentleman-Programming/gentle-ai) binary — resolved from
+  `plugin/claude-code/bin/gentle-ai` first, then `PATH`. To pin a specific version, place the
+  binary at `plugin/claude-code/bin/gentle-ai` (create the `bin/` directory; add it to `.gitignore`).
 - Python 3.x (for hook scripts)
 
 Optional but recommended:
