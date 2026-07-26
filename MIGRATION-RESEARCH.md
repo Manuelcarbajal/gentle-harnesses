@@ -216,10 +216,10 @@ Lo que gentle-pi tiene como adapter. Marcado por responsabilidad:
 
 | Feature | gentle-pi | gentle-claude | Responsabilidad |
 |---|---|---|---|
-| Risk-based lens routing (LOW/MED/HIGH) | ✅ `lib/review-risk.ts` | ❌ siempre bloquea igual | A |
-| 0 lenses para cambios triviales | ✅ | ❌ | A |
-| 1 lens para cambios estándar | ✅ | ❌ | A |
-| 4R completo para high-risk / >400 líneas | ✅ | ❌ parcial | A |
+| Risk-based lens routing (LOW/MED/HIGH) | ✅ `lib/review-risk.ts` | ✅ `classify_diff()` en `pre-tool-use.sh` | A |
+| 0 lenses para cambios triviales | ✅ | ✅ LOW → skip review | A |
+| 1 lens para cambios estándar | ✅ | ✅ MED → validate pre-commit | A |
+| 4R completo para high-risk / >400 líneas | ✅ | ✅ HIGH → validate pre-commit | A |
 | Correction budget `min(200, ceil(lines/2))` | ✅ | ❌ | GA |
 | Native authority binding | ✅ | ✅ vía gentle-ai CLI | GA |
 
@@ -227,28 +227,28 @@ Lo que gentle-pi tiene como adapter. Marcado por responsabilidad:
 
 | Feature | gentle-pi | gentle-claude | Responsabilidad |
 |---|---|---|---|
-| Clasificación de comandos (allow/confirm/block) | ✅ `classifyGuardedCommand()` | ❌ solo git commit/push | A |
-| Hard-deny para comandos destructivos | ✅ | ❌ | A |
-| Confirm para operaciones sensibles | ✅ | ❌ | A |
+| Clasificación de comandos (allow/confirm/block) | ✅ `classifyGuardedCommand()` | ✅ `classify_command()` en `pre-tool-use.sh` | A |
+| Hard-deny para comandos destructivos | ✅ | ✅ rm -rf /, force-push main, DROP TABLE, overwrite .env | A |
+| Confirm para operaciones sensibles | ✅ | ✅ force-push non-main, reset --hard, rm -rf | A |
 
 ### Orchestrator assets
 
 | Feature | gentle-pi | gentle-claude | Responsabilidad |
 |---|---|---|---|
-| `assets/orchestrator.md` | ✅ | ❌ todo en CLAUDE.md | A |
-| `assets/orchestrator-skills.md` | ✅ | ❌ | A |
-| `assets/orchestrator-memory.md` | ✅ | ❌ | A |
-| `assets/orchestrator-delegation.md` | ✅ | ❌ | A |
-| `assets/sdd-orchestrator-workflow.md` | ✅ | ✅ en `~/.claude/skills/` | A |
+| `assets/orchestrator.md` | ✅ | ✅ vía `vendor/gentle-pi/assets/` | A |
+| `assets/orchestrator-skills.md` | ✅ | ✅ vía vendor | A |
+| `assets/orchestrator-memory.md` | ✅ | ✅ vía vendor | A |
+| `assets/orchestrator-delegation.md` | ✅ | ✅ vía vendor | A |
+| `assets/sdd-orchestrator-workflow.md` | ✅ | ✅ vía vendor | A |
 
 ### Chains (workflow shortcuts)
 
 | Feature | gentle-pi | gentle-claude | Responsabilidad |
 |---|---|---|---|
-| `4r-review.chain.md` | ✅ | ❌ | A |
-| `sdd-full.chain.md` | ✅ | ❌ | A |
-| `sdd-plan.chain.md` | ✅ | ❌ | A |
-| `sdd-verify.chain.md` | ✅ | ❌ | A |
+| `4r-review.chain.md` | ✅ | ✅ vía `vendor/gentle-pi/assets/chains/` | A |
+| `sdd-full.chain.md` | ✅ | ✅ vía vendor | A |
+| `sdd-plan.chain.md` | ✅ | ✅ vía vendor | A |
+| `sdd-verify.chain.md` | ✅ | ✅ vía vendor | A |
 
 ### Agents (definiciones)
 
@@ -271,7 +271,7 @@ Lo que gentle-pi tiene como adapter. Marcado por responsabilidad:
 | issue-creation | ✅ | ✅ | A |
 | cognitive-doc-design | ✅ | ✅ | A |
 | work-unit-commits | ✅ | ✅ | A |
-| release | ✅ | ❌ | A |
+| release | ✅ | ✅ vía `vendor/gentle-pi/skills/release/` | A |
 | skill-registry | ✅ | ✅ | A |
 
 ### DX y experiencia
@@ -292,20 +292,24 @@ Lo que gentle-claude necesita implementar (responsabilidad A):
 **✅ = implementado | ❌ = pendiente**
 
 1. ✅ `marketplace.json` — crítico
-2. ❌ Binary local-first en `gentle_ai_bin()` — crítico, `$CLAUDE_PLUGIN_ROOT/bin/` antes de PATH
-3. ✅ post-compaction hook — importante
-4. ✅ SubagentStop hook — importante
-5. ❌ Risk-based lens routing en `pre-tool-use.sh` — importante, LOW/MED/HIGH
-6. ❌ Safety guards completos — medio, actualmente solo bloquea git commit/push
-7. ❌ `skills/gentle-ai/SKILL.md` — **importante**, define la identidad del harness como skill
-      inyectable; mayor impacto en token efficiency que cualquier otra optimización
-8. ❌ Prompts operacionales (`gpr`, `gcl`, `gis`, `gwr`) — importante, workflows específicos
-      con gentle-ai para PR review, changelog, issues — actualmente no existen
-9. ❌ Orchestrator assets separados — medio, `assets/` con lazy-loading vs CLAUDE.md monolítico
-10. ❌ Chains — medio, `4r-review`, `sdd-full`, `sdd-plan`, `sdd-verify`
-11. ❌ `release` skill — bajo
-12. ❌ Startup banner — bajo, polish (no equivalente nativo en Claude Code)
+2. ✅ Binary local-first en `gentle_ai_bin()` — `$CLAUDE_PLUGIN_ROOT/bin/` antes de PATH
+3. ✅ post-compaction hook
+4. ✅ SubagentStop hook
+5. ✅ Risk-based lens routing en `pre-tool-use.sh` — LOW/MED/HIGH via `classify_diff()`
+6. ✅ Safety guards completos — `classify_command()`: hard-deny + confirm + allow
+7. ✅ `skills/gentle-ai/SKILL.md` — harness identity + vendor Pi-context filter
+8. ✅ Prompts operacionales (`gpr`, `gcl`, `gis`, `gwr`)
+9. ✅ Orchestrator assets — vía `vendor/gentle-pi/assets/` (sparse submodule)
+10. ✅ Chains — vía `vendor/gentle-pi/assets/chains/`
+11. ✅ `release` skill — vía `vendor/gentle-pi/skills/release/`
+12. ❌ Startup banner — bajo, no hay equivalente nativo en Claude Code
 13. ❌ Model routing — bajo, conveniencia
+
+Pendiente para completar la integración del vendor:
+A. ❌ Registrar `vendor/gentle-pi/skills/` como fuente en `gentle-ai skill-registry`
+B. ❌ Actualizar `user-prompt-submit.sh` para lazy-load de `vendor/gentle-pi/assets/`
+C. ❌ CI/CD: `ci.yml` (bats) + `release.yml` (tag → GitHub Release)
+D. ❌ Docs: `DEVELOPMENT.md`, `ARCHITECTURE.md`, `CHANGELOG.md`
 
 ---
 
