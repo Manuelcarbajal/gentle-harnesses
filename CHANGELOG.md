@@ -7,6 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0-beta.2] - 2026-07-25
+
+### Fixed
+
+- **Marketplace plugin source** — `source` in `.claude-plugin/marketplace.json` was
+  missing the required `./` prefix for relative paths, breaking plugin installs
+- **CI bats suite** — the jq stub in `tests/bats/helpers.bash` hardcoded
+  `$HOME/.local/bin/jq`, which only exists on the dev machine; on CI (jq at
+  `/usr/bin/jq`) the stub failed and `pre-tool-use.sh` silently fell back to
+  fail-open, masking every gate and safety-guard test
+
+---
+
 ## [0.2.0-beta.1] - 2026-07-25
 
 ### Added
