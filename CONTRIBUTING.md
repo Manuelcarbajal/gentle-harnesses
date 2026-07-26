@@ -62,7 +62,7 @@ Each script in `plugin/claude-code/scripts/` must:
 - Exit `2` with `{"decision": "block", "reason": "..."}` to block a tool (PreToolUse only)
 - Print valid JSON to stdout on every path
 - Never block if `gentle-ai`, `codegraph`, or `jq` are missing — check availability first
-- Source `gentle_ai.sh` for shared utilities (`gentle_ai_bin`, `log_info`, etc.)
+- Source `gentle_ai.sh` for shared utilities (`gentle_ai_bin`, `gentle_ai_review_status`, etc.)
 
 ## Commit style
 

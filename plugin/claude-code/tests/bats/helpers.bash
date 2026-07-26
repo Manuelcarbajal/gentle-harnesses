@@ -26,25 +26,6 @@ setup() {
         export PATH="$PATH:/c/Program Files/Git/bin"
     fi
 
-    # Python3 shim: always create one in STUB_DIR so post-compaction tests work.
-    # Find the real python3/python executable to delegate to.
-    _real_python3=""
-    for _candidate in \
-        "/c/Users/manue/AppData/Local/Programs/Python/Python311/python.exe" \
-        "/c/Users/manue/AppData/Local/Programs/Python/Python311/python3.exe" \
-        "/c/Users/manue/AppData/Local/Microsoft/WindowsApps/python3.exe" \
-        "/usr/bin/python3" \
-        "/usr/local/bin/python3"; do
-        if [ -x "$_candidate" ]; then
-            _real_python3="$_candidate"
-            break
-        fi
-    done
-    if [ -n "$_real_python3" ]; then
-        printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$_real_python3" > "$STUB_DIR/python3"
-        chmod +x "$STUB_DIR/python3"
-    fi
-
     # Use a per-test project dir so tests don't pollute each other
     TEST_PROJECT_DIR="$(mktemp -d)"
     export CLAUDE_PROJECT_DIR="$TEST_PROJECT_DIR"
@@ -57,7 +38,6 @@ setup() {
     unset STUB_GENTLE_AI_STATUS_EXIT
     unset STUB_GIT_SHORTSTAT
     unset STUB_GIT_NAMES
-    unset STUB_PYTHON3_TRIGGER
     unset CLAUDE_TOOL_NAME
     unset CLAUDE_TOOL_INPUT
     unset CLAUDE_PLUGIN_ROOT
@@ -170,17 +150,4 @@ create_stub_jq() {
 exec "$REAL_JQ" "\$@"
 EOF
     chmod +x "$STUB_DIR/jq"
-}
-
-create_stub_python3() {
-    cat > "$STUB_DIR/python3" << 'STUB_EOF'
-#!/usr/bin/env bash
-TRIGGER="${STUB_PYTHON3_TRIGGER:-}"
-if [ -n "$TRIGGER" ]; then
-    echo "$TRIGGER"
-    exit 0
-fi
-exec python3 "$@"
-STUB_EOF
-    chmod +x "$STUB_DIR/python3"
 }

@@ -60,5 +60,9 @@ exist in Claude Code:
 - `extensions/startup-banner.ts`, `extensions/pi-pretty.ts` — Pi TUI extensions; no equivalent
 - `pi-mono`, `packages/ai/`, `packages/tui/`, `packages/coding-agent/` — Pi mono-repo paths
 - `earendil-works` — Pi organization; Claude Code equivalent is `Gentleman-Programming`
+- `gentle-ai-explore`, `gentle-ai-worker`, `gentle-ai-verify` — Pi's package-owned explore/write/verify subagent roles; no confirmed native equivalent — fall back to the `Agent` tool
+- `pi-subagents` — Pi's subagent model/thinking resolver (`.pi/settings.json`, `.pi/subagents.json`); no equivalent, Claude Code resolves this via agent frontmatter and the `Agent` tool's `model` parameter
+- `ask_user_question` — Pi's structured question tool; no equivalent, ask directly in conversation text instead
+- `/gentle:sdd-preflight` — Pi's SDD preflight slash command; Claude Code equivalent is `sdd-init`
 
 Everything else in vendor assets is platform-agnostic and applies as written.
