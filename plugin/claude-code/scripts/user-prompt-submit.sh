@@ -48,14 +48,26 @@ inject_asset_manifest() {
         [ -f "$path" ] && lines="${lines}\n- ${label}: \`${path}\`"
     }
 
-    _asset_row "Delegation rules"    "$assets_dir/orchestrator-delegation.md"
-    _asset_row "Memory protocol"     "$assets_dir/orchestrator-memory.md"
-    _asset_row "Skills discovery"    "$assets_dir/orchestrator-skills.md"
-    _asset_row "SDD workflow"        "$assets_dir/sdd-orchestrator-workflow.md"
-    _asset_row "Chain — 4R review"   "$assets_dir/chains/4r-review.chain.md"
-    _asset_row "Chain — SDD full"    "$assets_dir/chains/sdd-full.chain.md"
-    _asset_row "Chain — SDD plan"    "$assets_dir/chains/sdd-plan.chain.md"
-    _asset_row "Chain — SDD verify"  "$assets_dir/chains/sdd-verify.chain.md"
+    _asset_row "Delegation rules"      "$assets_dir/orchestrator-delegation.md"
+    _asset_row "Memory protocol"       "$assets_dir/orchestrator-memory.md"
+    _asset_row "Skills discovery"      "$assets_dir/orchestrator-skills.md"
+    _asset_row "SDD workflow"          "$assets_dir/sdd-orchestrator-workflow.md"
+    _asset_row "Chain — 4R review"     "$assets_dir/chains/4r-review.chain.md"
+    _asset_row "Chain — SDD full"      "$assets_dir/chains/sdd-full.chain.md"
+    _asset_row "Chain — SDD plan"      "$assets_dir/chains/sdd-plan.chain.md"
+    _asset_row "Chain — SDD verify"    "$assets_dir/chains/sdd-verify.chain.md"
+    _asset_row "Support — strict TDD"  "$assets_dir/support/strict-tdd.md"
+    _asset_row "Support — TDD verify"  "$assets_dir/support/strict-tdd-verify.md"
+    _asset_row "Support — SDD status"  "$assets_dir/support/sdd-status-contract.md"
+
+    # Agent definitions — load the matching file before delegating to that agent
+    local agent
+    for agent in "$assets_dir"/agents/*.md; do
+        [ -f "$agent" ] || continue
+        local aname
+        aname="$(basename "$agent" .md)"
+        _asset_row "Agent — ${aname}" "$agent"
+    done
 
     [ -z "$lines" ] && return 0
     printf '## Adapter Assets\n\nLoad the file when the workflow applies — do not preload.\n%b\n' "$lines"
