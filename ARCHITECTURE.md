@@ -75,7 +75,7 @@ materializes only the five directories that are platform-agnostic:
 | `skills/` | LLM-first skill definitions | `inject_adapter_skills()` |
 | `contracts/` | Review integration contract v1 | gentle-ai CLI |
 | `assets/` | Orchestrator sub-assets, chains | `inject_asset_manifest()` |
-| `docs/` | Review integration, architecture, skill style guide | `inject_asset_manifest()` (reference) |
+| `docs/` | Review integration, skill style guide | `inject_asset_manifest()` (reference) |
 | `prompts/` | Operational prompt templates | reference only (Pi-specific paths) |
 
 **What is NOT materialized:**

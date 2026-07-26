@@ -62,7 +62,6 @@ inject_asset_manifest() {
 
     local docs_dir="$ADAPTER_ROOT/vendor/gentle-pi/docs"
     _asset_row "Doc — review integration"        "$docs_dir/review-integration.md"
-    _asset_row "Doc — native authority arch"     "$docs_dir/native-authority-architecture.md"
     _asset_row "Doc — skill style guide"         "$docs_dir/skill-style-guide.md"
 
     # Agent definitions — load the matching file before delegating to that agent

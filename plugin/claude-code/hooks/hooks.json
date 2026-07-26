@@ -28,15 +28,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "gentle-ai skill-registry refresh --quiet --no-gitignore --cwd \"${CLAUDE_PROJECT_DIR:-$PWD}\" || true",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/user-prompt-submit.sh\"",
             "timeout": 10
           }

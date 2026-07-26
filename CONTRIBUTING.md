@@ -4,6 +4,9 @@
 
 - [Claude Code](https://claude.ai/code) CLI
 - [`gentle-ai`](https://github.com/Gentleman-Programming/gentle-ai) in PATH
+- Have run `gentle-ai install` (or `gentle-ai sync`) for the Claude Code adapter at least once
+  — it writes the native `skill-registry refresh` hook that this plugin relies on instead of
+  duplicating
 - `bash`, `jq`
 
 Optional but tested against:
