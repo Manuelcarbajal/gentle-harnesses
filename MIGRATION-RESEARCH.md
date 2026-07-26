@@ -322,10 +322,10 @@ Lo que gentle-claude necesita implementar (responsabilidad A):
 - [x] Keep root as project metadata (README, LICENSE, CONTRIBUTING, etc.)
 - [x] Update `hooks/hooks.json` paths accordingly
 
-### Phase 2 — Binary ❌
-- [ ] Update `gentle_ai_bin()` in `gentle_ai.sh` to check `$CLAUDE_PLUGIN_ROOT/bin/gentle-ai` first,
+### Phase 2 — Binary ✅
+- [x] Update `gentle_ai_bin()` in `gentle_ai.sh` to check `$CLAUDE_PLUGIN_ROOT/bin/gentle-ai` first,
       fallback to `command -v gentle-ai` — mirrors `lib/gentle-ai-binary.ts` without SHA256 overhead
-- [ ] Document binary version pinning in README (which version ships bundled, how to override)
+- [x] Document binary version pinning in README (which version ships bundled, how to override)
 
 ### Phase 3 — Missing Hooks ✅
 - [x] Add `post-compaction.sh` (SessionStart compact matcher)
@@ -361,20 +361,20 @@ Derived from `lib/review-risk.ts` and `extensions/gentle-ai.ts` (`classifyGuarde
 - [ ] Write `ROADMAP.md`
 - [ ] Write `CHANGELOG.md`
 
-### Phase 6 — Harness Identity Skill & Prompts ❌
+### Phase 6 — Harness Identity Skill & Prompts ✅
 **This is the biggest token-efficiency gap.** gentle-pi defines the harness as a discoverable
 SKILL that the skill registry injects dynamically. gentle-claude has no equivalent — its behavior
 is hardcoded in a monolithic CLAUDE.md loaded every session regardless of need.
 
-- [ ] Create `skills/gentle-ai/SKILL.md` — defines what gentle-claude IS as a harness:
+- [x] Create `skills/gentle-ai/SKILL.md` — defines what gentle-claude IS as a harness:
       identity, delegation rules, risk-based review, TDD protocol, SDD workflow pointer.
       Gets auto-discovered by `gentle-ai skill-registry refresh` and injected into context.
-- [ ] Create `prompts/gpr.md` — PR review workflow (add label, read diff, verify changelog,
+- [x] Create `prompts/gpr.md` — PR review workflow (add label, read diff, verify changelog,
       structured Good/Bad/Ugly output). Mirrors gentle-pi's `prompts/gpr.md`.
-- [ ] Create `prompts/gcl.md` — changelog audit before release (commits since last tag,
+- [x] Create `prompts/gcl.md` — changelog audit before release (commits since last tag,
       cross-package changelog verification). Mirrors gentle-pi's `prompts/gcl.md`.
-- [ ] Create `prompts/gis.md` — issue creation with issue-first methodology.
-- [ ] Create `prompts/gwr.md` — work review prompt.
+- [x] Create `prompts/gis.md` — issue creation with issue-first methodology.
+- [x] Create `prompts/gwr.md` — work review prompt.
 
 ### Phase 7 — Orchestrator Assets & Chains ❌
 Reduces CLAUDE.md bloat via modular lazy-loading. Mirrors `assets/` structure in gentle-pi.
