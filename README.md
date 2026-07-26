@@ -104,6 +104,8 @@ Plugin skills take priority over same-named vendor skills via two-pass deduplica
 
 ```
 .claude-plugin/marketplace.json      Marketplace metadata
+AGENTS.md                            Repo-wide instructions (universal — Codex, Cursor, etc.)
+CLAUDE.md                            Claude Code memory: @AGENTS.md import + Claude-specific notes
 plugin/claude-code/
   .claude-plugin/plugin.json         Plugin metadata
   hooks/hooks.json                   Hook declarations
