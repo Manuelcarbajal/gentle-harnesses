@@ -337,20 +337,23 @@ Lo que gentle-claude necesita implementar (responsabilidad A):
 - [x] Migrate `user-prompt-submit.py` → `user-prompt-submit.sh`
 - [x] Migrate `pre-tool-use.py` → `pre-tool-use.sh`
 - [x] Migrate `session-stop.py` → `session-stop.sh`
-- [ ] Rewrite test suite for shell scripts (bats) — currently still pytest
+- [x] Rewrite test suite for shell scripts (bats) — 47 tests in `tests/bats/`, runner at `tests/run_bats.sh`
+      Infrastructure: bats-core 1.14.0 + bats-support + bats-assert installed via `tests/install-deps.sh`
+      Libs excluded from repo (`tests/libs/` gitignored) — cloned on demand, not vendored
+      Per-test stub system (gentle-ai, git, codegraph, python3, jq) controlled via env vars
 
-### Phase 4b — Risk Routing & Safety Guards ❌
+### Phase 4b — Risk Routing & Safety Guards ✅
 Derived from `lib/review-risk.ts` and `extensions/gentle-ai.ts` (`classifyGuardedCommand`).
 
-- [ ] Implement LOW/MED/HIGH classification in `pre-tool-use.sh`:
-      - Get diff stat before blocking (lines changed + paths)
-      - LOW (only docs, no config, no binaries) → skip review gate entirely
-      - MED → require 1 dominant lens via `gentle-ai review start`
-      - HIGH (>400 lines OR high-risk path tokens) → require 4R
-- [ ] Expand safety guards beyond git:
-      - Hard-deny: `rm -rf /`, `git push --force` to main/master, `DROP TABLE`, credential writes
-      - Confirm: any `git push --force` (non-main), file deletes, `git reset --hard`
+- [x] Implement LOW/MED/HIGH classification in `pre-tool-use.sh` via `classify_diff()`:
+      - LOW (only .md/.txt/.rst/.adoc staged) → skip review gate entirely
+      - MED (everything else) → validate pre-commit gate
+      - HIGH (>400 changed lines OR high-risk path tokens: auth, security, token, credential, etc.) → validate pre-commit gate
+- [x] Expand safety guards via `classify_command()`:
+      - Hard-deny: `rm -rf /`, `rm -rf /*`, `git push --force` to main/master, `DROP TABLE/DATABASE/SCHEMA`, overwrite `.env`
+      - Confirm: `git push --force` (non-main), `git reset --hard`, `rm -rf <non-root>`
       - Allow: everything else
+- [x] Bug fix: `${CLAUDE_TOOL_INPUT:-{}}` bash expansion appended extra `}` when var was set — replaced with two-line assignment guard
 
 ### Phase 5 — CI/CD + Docs ❌
 - [ ] GitHub Actions: `ci.yml` (bats + pytest on every PR, matching gentle-pi's `pnpm test` pattern)
@@ -375,6 +378,30 @@ is hardcoded in a monolithic CLAUDE.md loaded every session regardless of need.
       cross-package changelog verification). Mirrors gentle-pi's `prompts/gcl.md`.
 - [x] Create `prompts/gis.md` — issue creation with issue-first methodology.
 - [x] Create `prompts/gwr.md` — work review prompt.
+
+### Phase 4c — gentle-pi as Submodule ❌
+Skills in gentle-pi (`skills/`, `prompts/`, `contracts/`) are LLM-first and platform-agnostic —
+they work in Claude Code without modification. Instead of duplicating them, gentle-claude references
+gentle-pi directly as a git submodule so updates flow in with one command.
+
+What's useful for Claude (platform-agnostic):
+- `skills/` — branch-pr, chained-pr, cognitive-doc-design, comment-writer, gentle-ai,
+  issue-creation, judgment-day, release, skill-creator, skill-improver, skill-registry,
+  work-unit-commits, _shared/review-ledger-contract.md
+- `prompts/` — gcl.md, gis.md, gpr.md, gwr.md, skill-creation.md
+- `contracts/review-integration/v1/` — review integration contract
+
+What's Pi-specific (not applicable to Claude):
+- `extensions/` — TypeScript Pi runtime extensions (startup-banner, pi-pretty, quiet-tools, etc.)
+- `lib/` — TypeScript review library implementation
+- `scripts/` — Node.js build/installer scripts (gentle-pi is an npm package; gentle-claude is not)
+- `runtime/`, `themes/`, `openspec/` — Pi internal infrastructure
+
+- [ ] `git submodule add https://github.com/Gentleman-Programming/gentle-pi.git vendor/gentle-pi`
+- [ ] Update `user-prompt-submit.sh` to inject skills from `vendor/gentle-pi/skills/` instead of
+      any local copies — zero duplication
+- [ ] Update `user-prompt-submit.sh` to inject prompts from `vendor/gentle-pi/prompts/`
+- [ ] Document in `DEVELOPMENT.md`: run `git submodule update --remote` to pull latest gentle-pi
 
 ### Phase 7 — Orchestrator Assets & Chains ❌
 Reduces CLAUDE.md bloat via modular lazy-loading. Mirrors `assets/` structure in gentle-pi.

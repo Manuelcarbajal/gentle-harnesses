@@ -10,3 +10,6 @@ __pycache__/
 .pytest_cache/
 
 /md
+
+# Bats test dependencies (install via tests/install-deps.sh)
+plugin/claude-code/tests/libs/
