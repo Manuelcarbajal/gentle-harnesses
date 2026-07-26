@@ -9,7 +9,8 @@ BATS_ASSERT_VERSION="v2.1.0"
 BATS_SUPPORT_VERSION="v0.3.0"
 
 clone_or_update() {
-    local name="$1" url="$2" tag="$3" dest="$LIBS_DIR/$name"
+    local name="$1" url="$2" tag="$3"
+    local dest="$LIBS_DIR/$name"
     if [ -d "$dest" ]; then
         printf 'already installed: %s\n' "$name"
         return

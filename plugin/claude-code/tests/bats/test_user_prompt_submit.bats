@@ -3,12 +3,12 @@
 
 load "helpers"
 
-@test "no gentle-ai and no registry exits 0 with no output" {
+@test "no gentle-ai and no registry still emits asset manifest" {
     create_stub_jq
-    # No gentle-ai stub, no registry file
+    # No gentle-ai stub, no registry file — vendor assets are always injected
     run bash "$SCRIPTS_DIR/user-prompt-submit.sh"
     assert_success
-    assert_output ""
+    assert_output --partial "Adapter Assets"
 }
 
 @test "review pending outputs systemMessage warning" {
