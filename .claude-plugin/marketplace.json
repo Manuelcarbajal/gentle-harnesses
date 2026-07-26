@@ -1,5 +1,6 @@
 {
   "name": "gentle-claude",
+  "description": "gentle-ai ecosystem for Claude Code: skill registry injection, review lifecycle hooks, and ecosystem health checks at session boundaries.",
   "owner": {
     "name": "Manuel Carbajal",
     "url": "https://github.com/Manuelcarbajal"
