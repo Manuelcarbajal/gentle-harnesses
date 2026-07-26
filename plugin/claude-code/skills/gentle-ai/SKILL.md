@@ -48,3 +48,17 @@ For complex, risky, or ambiguous work: use SDD phases — explore → propose �
 For simple tasks with a clear, bounded scope: skip SDD entirely.
 
 When in doubt about complexity, use `/sdd-explore` before starting implementation.
+
+## Vendor asset context
+
+Assets and skills in `vendor/gentle-pi/` originate from gentle-pi (the Pi platform counterpart).
+When loading these files, apply this filter — the following references are Pi-specific and do not
+exist in Claude Code:
+
+- `subagent_run` — Pi's native subagent launcher; use the `Agent` tool instead
+- `~/.pi/`, `.pi/`, `pi install` — Pi local runtime paths and package manager
+- `extensions/startup-banner.ts`, `extensions/pi-pretty.ts` — Pi TUI extensions; no equivalent
+- `pi-mono`, `packages/ai/`, `packages/tui/`, `packages/coding-agent/` — Pi mono-repo paths
+- `earendil-works` — Pi organization; Claude Code equivalent is `Gentleman-Programming`
+
+Everything else in vendor assets is platform-agnostic and applies as written.
