@@ -318,7 +318,7 @@ D. ❌ Docs: `DEVELOPMENT.md`, `ARCHITECTURE.md`, `CHANGELOG.md`
 ### Phase 0 — Foundations ✅
 - [x] Create `.claude-plugin/marketplace.json`
 - [x] Tag v0.1.0 in git + create GitHub Release
-- [ ] Add GitHub Topics: `gentle-ai`, `claude-code`, `plugin`, `review-lifecycle`, `skill-registry`
+- [x] Add GitHub Topics: `gentle-ai`, `claude-code`, `plugin`, `review-lifecycle`, `skill-registry` — do via GitHub UI
 - [ ] Write `CHANGELOG.md`
 
 ### Phase 1 — Structure ✅
@@ -359,14 +359,14 @@ Derived from `lib/review-risk.ts` and `extensions/gentle-ai.ts` (`classifyGuarde
       - Allow: everything else
 - [x] Bug fix: `${CLAUDE_TOOL_INPUT:-{}}` bash expansion appended extra `}` when var was set — replaced with two-line assignment guard
 
-### Phase 5 — CI/CD + Docs ❌
-- [ ] GitHub Actions: `ci.yml` (bats + pytest on every PR, matching gentle-pi's `pnpm test` pattern)
-- [ ] GitHub Actions: `release.yml` (tag → GitHub Release, mirrors gentle-pi's `publish.yml`)
-- [ ] Write `ARCHITECTURE.md`
+### Phase 5 — CI/CD + Docs ❌ (partial)
+- [ ] GitHub Actions: `ci.yml` (bats on every PR)
+- [ ] GitHub Actions: `release.yml` (tag → GitHub Release)
+- [x] Write `ARCHITECTURE.md`
 - [ ] Write `DEVELOPMENT.md`
 - [ ] Write `SECURITY.md`
 - [ ] Write `ROADMAP.md`
-- [ ] Write `CHANGELOG.md`
+- [x] Write `CHANGELOG.md`
 
 ### Phase 6 — Harness Identity Skill & Prompts ✅
 **This is the biggest token-efficiency gap.** gentle-pi defines the harness as a discoverable
@@ -428,7 +428,7 @@ Note on skills/gentle-ai: local `plugin/claude-code/skills/gentle-ai/SKILL.md` d
       name — local plugin skill wins over same-named vendor skill. Encapsulated in one
       removable function if gentle-ai adds native vendor/ support.
 - [x] Add Pi-context filter to `skills/gentle-ai/SKILL.md`
-- [ ] Document in `DEVELOPMENT.md`: `git submodule update --remote` to pull latest gentle-pi
+- [ ] Write `DEVELOPMENT.md` (includes: run tests, update submodule, add skills, hook dev)
 
 ### Phase 7 — Orchestrator Assets & Chains ✅ (via vendor)
 Assets exist in `vendor/gentle-pi/assets/` — no local creation needed.
