@@ -7,6 +7,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0-beta.5] - 2026-07-26
+
+### Added
+
+- **Local release runbook** — `plugin/claude-code/skills/release/SKILL.md` overrides the
+  vendored `gentle-pi` release skill (npm publish process) with the actual gentle-claude
+  mechanism: tag push -> `release.yml` -> GitHub Release, no npm involved.
+
+### Changed
+
+- **`gentle-ai install`/`sync` now owns skill-registry refresh** — removed the duplicate
+  hook declaration from `hooks.json` that fired the same refresh a second time per prompt
+  for anyone who also ran `gentle-ai install`. Narrowed `vendor/gentle-pi`'s sparse-checkout
+  to drop the 10 skills, 20 agents, and 1 doc that `gentle-ai` already installs natively in
+  the correct Claude Code format.
+- **Pre-commit gate bridged to `gentle-ai review status`** — `pre-tool-use.sh` now reads the
+  risk tier from a read-only `review status` call (`.frozen.tier`, when an applicable receipt
+  exists) instead of relying solely on the local `classify_diff()` heuristic, which stays as a
+  documented fallback for when no receipt applies or the CLI is unavailable. Reads status
+  rather than calling the mutating `review start` from inside the gate, per the ecosystem's
+  own review-integration contract (gates must never launch review actors).
+
+### Fixed
+
+- **Silent `subagent-stop.sh` / `session-stop.sh` failures** — `subagent-stop.sh` shelled out
+  to a nonexistent `gentle-ai mem` subcommand, silently no-op'ing every `SubagentStop` event;
+  it now nudges the agent via `additionalContext` to call `mem_capture_passive` itself, since a
+  hook process can't invoke MCP tools directly. `session-stop.sh` built its warning
+  `systemMessage` inside a backgrounded subshell after `exit 0`, so Claude Code never received
+  it; it now runs synchronously before exit.
+
+---
+
 ## [0.2.0-beta.4] - 2026-07-26
 
 ### Changed
