@@ -1,5 +1,5 @@
 {
-  "description": "gentle-ai ecosystem hooks for Claude Code — health check, skill registry injection, review gate validation, and pre-commit enforcement",
+  "description": "gentle-ai ecosystem hooks for Claude Code — health check, post-compaction context recovery, skill registry injection, review gate validation, pre-commit enforcement, and passive subagent memory capture",
   "hooks": {
     "SessionStart": [
       {
@@ -9,6 +9,15 @@
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh\"",
             "timeout": 20,
             "statusMessage": "Checking gentle-ai ecosystem..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/post-compaction.sh\"",
+            "timeout": 15
           }
         ]
       }
@@ -44,13 +53,24 @@
         ]
       }
     ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-stop.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-stop.sh\"",
-            "timeout": 10
+            "timeout": 30
           }
         ]
       }
