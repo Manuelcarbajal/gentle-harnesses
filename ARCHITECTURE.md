@@ -20,7 +20,8 @@ Claude Code (host)
                     ├── skills/       ← platform-agnostic skill definitions
                     ├── prompts/      ← Pi prompts (not injected — Pi-specific paths)
                     ├── contracts/    ← review integration contract v1
-                    └── assets/       ← orchestrator sub-assets and chains
+                    ├── assets/       ← orchestrator sub-assets and chains
+                    └── docs/         ← review integration, architecture, skill style guide (reference)
 ```
 
 ## Hook flow

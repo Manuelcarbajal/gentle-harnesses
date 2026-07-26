@@ -1,0 +1,23 @@
+gentle-claude includes and adapts material from gentle-pi:
+
+  gentle-pi
+  https://github.com/Gentleman-Programming/gentle-pi
+  Copyright (c) 2025 Mario Zechner
+  Licensed under the MIT License (see vendor/gentle-pi/LICENSE)
+
+gentle-pi is vendored as a sparse git submodule at vendor/gentle-pi/
+(skills/, prompts/, contracts/, assets/, docs/ only).
+
+The following files are adapted from gentle-pi's originals for the
+Claude Code platform (paths, CLI invocations, and Pi-specific concepts
+rewritten; gentle-pi's copyright and MIT license apply to the portions
+carried over):
+
+  plugin/claude-code/prompts/gpr.md   (from vendor/gentle-pi/prompts/gpr.md)
+  plugin/claude-code/prompts/gcl.md   (from vendor/gentle-pi/prompts/gcl.md)
+  plugin/claude-code/prompts/gis.md   (from vendor/gentle-pi/prompts/gis.md)
+  plugin/claude-code/prompts/gwr.md   (from vendor/gentle-pi/prompts/gwr.md)
+  plugin/claude-code/skills/gentle-ai/SKILL.md
+
+All other files in this repository are Copyright (c) 2026 Manuel Carbajal,
+licensed under the MIT License (see LICENSE).

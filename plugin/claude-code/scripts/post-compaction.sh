@@ -6,9 +6,10 @@ source "$SCRIPTS_DIR/gentle_ai.sh"
 
 CWD="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
-trigger=$(python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('trigger',''))" 2>/dev/null)
+input=$(cat)
+hook_source=$(printf '%s' "$input" | jq -r '.source // ""' 2>/dev/null)
 
-[ "$trigger" != "post_compact" ] && exit 0
+[ "$hook_source" != "compact" ] && exit 0
 
 status=$(gentle_ai_review_status "$CWD")
 

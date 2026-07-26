@@ -3,18 +3,23 @@
 A [Claude Code](https://claude.ai/code) plugin that wires the [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) ecosystem into your Claude sessions — ecosystem health checks, skill registry injection, review lifecycle enforcement, and session continuity via Engram.
 
 Mirrors what [gentle-pi](https://github.com/Gentleman-Programming/gentle-pi) does for the Pi coding agent.
+gentle-pi is vendored as a submodule and some of its prompts/skills are adapted here for
+Claude Code — see [NOTICE](./NOTICE) for attribution.
 
 ## Installation
 
 ```bash
 claude plugin marketplace add Manuelcarbajal/gentle-ai-claude
+claude plugin install gentle-claude@gentle-claude
 ```
 
 Or clone and install manually:
 
 ```bash
 git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-ai-claude.git
-claude plugin install --directory gentle-ai-claude
+cd gentle-ai-claude
+claude plugin marketplace add .
+claude plugin install gentle-claude@gentle-claude
 ```
 
 ## What it does
@@ -109,7 +114,7 @@ plugin/claude-code/
   skills/gentle-ai/SKILL.md          Claude Code harness identity skill
   prompts/                           Claude Code adapted workflow prompts
   tests/                             bats test suite (47 tests)
-vendor/gentle-pi/                    Sparse git submodule (skills, assets, contracts)
+vendor/gentle-pi/                    Sparse git submodule (skills, assets, contracts, docs, prompts)
 AGENTS.md                            GGA code review rules
 ```
 

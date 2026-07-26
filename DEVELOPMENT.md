@@ -129,6 +129,17 @@ The hook exits with code `0` (allow) or `2` (block) and prints JSON to stdout.
 ## Release
 
 1. Update `CHANGELOG.md` — move `[Unreleased]` entries under a new version section
-2. Bump `version` in `.claude-plugin/plugin.json` (or wherever `plugin.json` lives)
-3. Tag: `git tag v<version> && git push origin v<version>`
+2. Bump `version` in `plugin/claude-code/.claude-plugin/plugin.json`
+3. Tag: `git tag v<version> && git push origin v<version>` — never move a tag that's already
+   been pushed; cut a new version instead, tags are treated as immutable once published
 4. The `release.yml` GitHub Action publishes the release automatically
+
+### Marketplace metadata
+
+The repo-root `.claude-plugin/marketplace.json` is a different file with a different schema
+from `plugin.json` — it's the catalog Claude Code reads when someone runs
+`claude plugin marketplace add`. Each plugin entry's relative `source` path **must start with
+`./`** and resolves relative to the marketplace root (the directory containing
+`.claude-plugin/`), not the `.claude-plugin/` directory itself — see the
+[marketplace schema docs](https://code.claude.com/docs/en/plugin-marketplaces). Update this
+file when adding a plugin entry for another platform (e.g. `plugin/cursor/`).

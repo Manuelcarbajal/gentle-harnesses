@@ -13,6 +13,7 @@
         ]
       },
       {
+        "matcher": "compact",
         "hooks": [
           {
             "type": "command",

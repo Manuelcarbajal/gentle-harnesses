@@ -17,7 +17,8 @@ Optional but tested against:
 ```bash
 git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-ai-claude.git
 cd gentle-ai-claude
-claude plugin install --directory .
+claude plugin marketplace add .
+claude plugin install gentle-claude@gentle-claude
 ```
 
 To reload after editing a hook script:
