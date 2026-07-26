@@ -388,9 +388,24 @@ Skills in gentle-pi (`skills/`, `prompts/`, `contracts/`) are LLM-first and plat
 they work in Claude Code without modification. Instead of duplicating them, gentle-claude references
 gentle-pi directly as a git submodule so updates flow in with one command.
 
-Sparse checkout — only materializes the 4 directories applicable to Claude Code:
-  `vendor/gentle-pi/skills/`, `vendor/gentle-pi/prompts/`, `vendor/gentle-pi/contracts/`,
-  `vendor/gentle-pi/assets/`
+Sparse checkout — materializes only directories applicable to Claude Code:
+  `skills/`, `prompts/`, `contracts/`, `assets/`, `docs/`
+
+Complete directory inventory (all of gentle-pi):
+
+  ✅ skills/     — 13 platform-agnostic skill definitions → injected via inject_adapter_skills()
+  ✅ assets/     — orchestrator sub-assets, chains, 26 agent defs, support docs → lazy manifest
+  ✅ contracts/  — review-integration v1 (fixtures/, schemas/) → used by gentle-ai CLI
+  ✅ docs/       — review-integration.md, native-authority-architecture.md, skill-style-guide.md
+                   → reference docs, platform-agnostic → added to lazy manifest
+  ⚠️ prompts/   — in sparse (reference only); NOT injected — Pi-specific mono-repo paths
+  ❌ runtime/    — .mjs Pi runtime files (Node.js) — NOT applicable
+  ❌ openspec/   — Pi's own SDD artifacts (config.yaml, changes/, specs/) — NOT applicable
+  ❌ extensions/ — TypeScript Pi TUI extensions — NOT applicable
+  ❌ lib/        — TypeScript review library implementation — NOT applicable
+  ❌ scripts/    — Node.js build and installer scripts — NOT applicable
+  ❌ tests/      — Pi test suite — NOT applicable
+  ❌ themes/     — Pi UI themes — NOT applicable
 
 What's in vendor/gentle-pi/skills/ (now available without duplication):
   branch-pr, chained-pr, cognitive-doc-design, comment-writer, gentle-ai (Pi version — differs
@@ -406,7 +421,7 @@ Note on skills/gentle-ai: local `plugin/claude-code/skills/gentle-ai/SKILL.md` d
   identities for different platforms.
 
 - [x] `git submodule add https://github.com/Gentleman-Programming/gentle-pi.git vendor/gentle-pi`
-      with sparse checkout: `git sparse-checkout set skills prompts contracts assets`
+      with sparse checkout: `git sparse-checkout set skills prompts contracts assets docs`
 - [x] Register vendor skills via `inject_adapter_skills()` in `user-prompt-submit.sh`:
       reads official registry first (gentle-ai as primary source), then appends plugin/
       and vendor/gentle-pi/skills/ rows with scope "plugin"/"adapter". Deduplicates by
