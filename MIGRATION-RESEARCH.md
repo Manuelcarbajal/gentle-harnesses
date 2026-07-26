@@ -1,6 +1,6 @@
 # Migration Research
 
-Status: **COMPLETE — ready to plan migration**
+Status: **COMPLETE — migration implemented and validated**
 
 This document tracks the research phase for the upcoming restructuring of `gentle-claude`.
 All reference repos have been analyzed. Decisions are finalized below.
@@ -359,13 +359,13 @@ Derived from `lib/review-risk.ts` and `extensions/gentle-ai.ts` (`classifyGuarde
       - Allow: everything else
 - [x] Bug fix: `${CLAUDE_TOOL_INPUT:-{}}` bash expansion appended extra `}` when var was set — replaced with two-line assignment guard
 
-### Phase 5 — CI/CD + Docs ❌ (partial)
-- [ ] GitHub Actions: `ci.yml` (bats on every PR)
-- [ ] GitHub Actions: `release.yml` (tag → GitHub Release)
+### Phase 5 — CI/CD + Docs ✅ (core complete)
+- [x] GitHub Actions: `ci.yml` (bats on every PR, runs on ubuntu-latest with `--recurse-submodules`)
+- [x] GitHub Actions: `release.yml` (tag → GitHub Release, extracts CHANGELOG entry)
 - [x] Write `ARCHITECTURE.md`
-- [ ] Write `DEVELOPMENT.md`
-- [ ] Write `SECURITY.md`
-- [ ] Write `ROADMAP.md`
+- [x] Write `DEVELOPMENT.md` (clone with --recurse-submodules, run tests, vendor update, hook dev, release steps)
+- [ ] Write `SECURITY.md` — low priority, no sensitive data handled
+- [ ] Write `ROADMAP.md` — low priority
 - [x] Write `CHANGELOG.md`
 
 ### Phase 6 — Harness Identity Skill & Prompts ✅
@@ -428,7 +428,7 @@ Note on skills/gentle-ai: local `plugin/claude-code/skills/gentle-ai/SKILL.md` d
       name — local plugin skill wins over same-named vendor skill. Encapsulated in one
       removable function if gentle-ai adds native vendor/ support.
 - [x] Add Pi-context filter to `skills/gentle-ai/SKILL.md`
-- [ ] Write `DEVELOPMENT.md` (includes: run tests, update submodule, add skills, hook dev)
+- [x] Write `DEVELOPMENT.md` (includes: run tests, update submodule, add skills, hook dev)
 
 ### Phase 7 — Orchestrator Assets & Chains ✅ (via vendor)
 Assets exist in `vendor/gentle-pi/assets/` — no local creation needed.
@@ -453,6 +453,28 @@ Pi-specific reference counts per file:
       `inject_asset_manifest()` emits a path manifest per prompt (not file content).
       Agents read the asset file when the workflow applies — nothing is preloaded eagerly.
       orchestrator.md excluded (Pi-specific); sub-assets and chains are platform-agnostic.
+
+### Phase 8 — Cleanup Pass ✅
+Executed after full live flow validation (all 47 bats tests green, hooks verified manually).
+
+**Bug fixed before cleanup:**
+- `inject_adapter_skills()` table formatting: `$()` strips trailing newlines from `plugin_rows`/`vendor_rows`,
+  causing rows to concatenate into a single line. Fixed printf format to `'%s%s\n%s\n%s\n'` with explicit `\n`
+  separators. Committed as `fix(hook): preserve row separators in adapter skills table`.
+
+**Files removed (Python era leftovers, no longer applicable):**
+- `plugin/claude-code/pytest.ini` — pytest config; all tests now run under bats
+- `plugin/claude-code/requirements-dev.txt` — `pytest>=7.0`; replaced by `tests/install-deps.sh`
+
+**Files updated:**
+- `plugin/claude-code/.env.example` — Usage line updated from `python scripts/session-start.py`
+  to `bash scripts/session-start.sh`; env var documentation itself remains valid
+
+**Untracked artifacts (already gitignored, no action needed):**
+- `plugin/claude-code/scripts/__pycache__/` — Python bytecode, covered by `__pycache__/` in `.gitignore`
+- `plugin/claude-code/tests/__pycache__/` — same
+- `.pytest_cache/` — covered by `.pytest_cache/` in `.gitignore`
+- `md/MIGRATION.MD` — covered by `/md` in `.gitignore`
 
 ---
 
