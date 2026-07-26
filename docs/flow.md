@@ -10,8 +10,10 @@ flowchart TD
 
     subgraph plugin["gentle-claude plugin"]
         SS["session-start.sh"]
+        PC["post-compaction.sh"]
         UPS["user-prompt-submit.sh"]
         PTU["pre-tool-use.sh"]
+        AGS["subagent-stop.sh"]
         STO["session-stop.sh (async)"]
     end
 
@@ -24,9 +26,11 @@ flowchart TD
     GA["gentle-ai CLI"]
     AGENT["Agent (Claude in context)"]
 
-    CC -->|SessionStart| SS
+    CC -->|SessionStart startup| SS
+    CC -->|SessionStart compact| PC
     CC -->|UserPromptSubmit| UPS
     CC -->|PreToolUse| PTU
+    CC -->|SubagentStop| AGS
     CC -->|Stop| STO
 
     SS --> GA

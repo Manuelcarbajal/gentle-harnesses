@@ -4,7 +4,7 @@
 
 - [Claude Code](https://claude.ai/code) CLI
 - [`gentle-ai`](https://github.com/Gentleman-Programming/gentle-ai) in PATH
-- Python 3.x
+- `bash`, `jq`
 
 Optional but tested against:
 
@@ -15,7 +15,7 @@ Optional but tested against:
 ## Local install
 
 ```bash
-git clone https://github.com/Manuelcarbajal/gentle-ai-claude.git
+git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-ai-claude.git
 cd gentle-ai-claude
 claude plugin install --directory .
 ```
@@ -28,22 +28,13 @@ To reload after editing a hook script:
 
 ## Dev environment
 
-Install test dependencies:
+See [DEVELOPMENT.md](DEVELOPMENT.md) for full setup, test runner, and vendor update instructions.
+
+Quick start:
 
 ```bash
-pip install -r requirements-dev.txt
-```
-
-Run the test suite:
-
-```bash
-pytest
-```
-
-Copy the hook environment reference for manual testing:
-
-```bash
-cp .env.example .env
+bash plugin/claude-code/tests/install-deps.sh
+bash plugin/claude-code/tests/run_bats.sh
 ```
 
 ## Before opening a PR
@@ -61,21 +52,21 @@ Only then commit and push. The PR template will ask you to confirm the receipt.
 
 ## Hook script contract
 
-Each script in `scripts/` must:
+Each script in `plugin/claude-code/scripts/` must:
 
-- Exit `0` and print valid JSON on success
+- Exit `0` on all non-blocking paths (fail-open)
 - Exit `2` with `{"decision": "block", "reason": "..."}` to block a tool (PreToolUse only)
-- Never raise an uncaught exception — wrap all subprocess calls in try/except
-- Be fail-open: if `gentle-ai`, `engram`, or `gga` are missing, exit `0` cleanly
-- Be importable as a module — use `main()` + `if __name__ == "__main__": main()`
+- Print valid JSON to stdout on every path
+- Never block if `gentle-ai`, `codegraph`, or `jq` are missing — check availability first
+- Source `gentle_ai.sh` for shared utilities (`gentle_ai_bin`, `log_info`, etc.)
 
 ## Commit style
 
 Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-fix(session-start): add encoding guard for Windows subprocess output
-feat(pre-tool-use): block git push without review receipt
+fix(pre-tool-use): guard against empty CLAUDE_TOOL_INPUT
+feat(hooks): add subagent-stop hook
 docs: update installation instructions
-test: add coverage for gate() fail-open paths
+test: add coverage for classify_diff LOW tier
 ```

@@ -1,17 +1,18 @@
 # Code Review Rules
 
-## Python
+## Hook scripts (bash)
 
-- Use type annotations on all function signatures
-- Subprocess calls: use `shutil.which()` to detect binaries that are Windows `.CMD`/`.bat` wrappers before calling them (e.g., `gga`, `codegraph`); for regular binaries, catching `FileNotFoundError` in the caller is sufficient
-- Fail-open pattern: `FileNotFoundError` and `TimeoutExpired` must not block operations
-- Return empty string `""` on skip/no-issue; return non-empty string on actionable issue
+- Source `gentle_ai.sh` for shared utilities — never duplicate `gentle_ai_bin()` or logging helpers
+- Fail-open pattern: if `gentle-ai`, `codegraph`, or `jq` are absent, print an advisory JSON and exit 0
+- Exit 2 only from PreToolUse scripts, with `{"decision":"block","reason":"..."}` on stdout
+- All exit paths must produce valid JSON on stdout — no silent exits
 - Hook timeout budgets: sum of all subprocess timeouts must stay below hook wall-clock limit
-- No bare `except Exception` outside of hook scripts where silent-fail is the contract
+- Two-line guard for env vars that may be unset: assign first, then use — avoid `${VAR:-default}` inside complex expansions
+- `systemMessage` for user-visible warnings; advisory context goes in `hookSpecificOutput.additionalContext` (nested, not top-level)
 
-## Hook scripts
+## Tests (bats)
 
-- Each script must exit cleanly (exit 0) on all non-blocking paths
-- PreToolUse scripts exit 2 to block a tool call, 0 to allow
-- Hook output must be valid JSON on stdout: `systemMessage`, `hookSpecificOutput`, or `{"decision":"block","reason":"..."}`
-- `systemMessage` for user-visible warnings; `additionalContext` for advisory context only (nested as `hookSpecificOutput.additionalContext`, not a top-level key)
+- Each test stubs external binaries (gentle-ai, git, codegraph, jq) via env vars from `helpers.bash` — never call real binaries
+- One test file per hook script
+- Test every exit path: allow (0), block (2), and fail-open (0 on missing dependency)
+- Golden output tests use `assert_output` from bats-assert, not manual string matching

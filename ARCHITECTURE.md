@@ -67,13 +67,14 @@ If gentle-ai adds native support for vendor/ paths, remove this function and not
 
 **Why sparse?** gentle-pi is an npm package with a full TypeScript runtime (`lib/`,
 `extensions/`, `scripts/`). None of that applies to Claude Code. Sparse checkout
-materializes only the four directories that are platform-agnostic:
+materializes only the five directories that are platform-agnostic:
 
 | Directory | What it contains | Used by |
 |---|---|---|
 | `skills/` | LLM-first skill definitions | `inject_adapter_skills()` |
 | `contracts/` | Review integration contract v1 | gentle-ai CLI |
 | `assets/` | Orchestrator sub-assets, chains | `inject_asset_manifest()` |
+| `docs/` | Review integration, architecture, skill style guide | `inject_asset_manifest()` (reference) |
 | `prompts/` | Operational prompt templates | reference only (Pi-specific paths) |
 
 **What is NOT materialized:**

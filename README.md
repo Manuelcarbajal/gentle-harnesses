@@ -1,60 +1,52 @@
-# gentle-ai-claude
+# gentle-claude
 
-A [Claude Code](https://claude.ai/code) plugin that wires the [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) ecosystem into your Claude sessions — health checks, skill registry injection, review lifecycle enforcement, and session continuity via Engram.
+A [Claude Code](https://claude.ai/code) plugin that wires the [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) ecosystem into your Claude sessions — ecosystem health checks, skill registry injection, review lifecycle enforcement, and session continuity via Engram.
 
 Mirrors what [gentle-pi](https://github.com/Gentleman-Programming/gentle-pi) does for the Pi coding agent.
 
+## Installation
+
+```bash
+claude plugin marketplace add Manuelcarbajal/gentle-ai-claude
+```
+
+Or clone and install manually:
+
+```bash
+git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-ai-claude.git
+claude plugin install --directory gentle-ai-claude
+```
+
 ## What it does
 
-| Hook | Behavior |
-|---|---|
-| **SessionStart** | Checks gentle-ai binary, ecosystem health (`gentle-ai doctor`), and codegraph binary. Injects the last session snapshot from Engram as context. |
-| **UserPromptSubmit** | Refreshes the skill registry (`.atl/skill-registry.md`) and injects it as context. Adds review lifecycle status and active SDD phase on every prompt. Surfaces a blocking `systemMessage` when a review is required before committing. |
-| **PreToolUse** | Blocks `git commit` and `git push` when no valid review receipt exists for the current workspace. Fail-open: if `gentle-ai` is unavailable, commits are never blocked. |
-| **Stop** | Validates the review gate on session end. Saves a session summary to Engram under the key `session-end:{project}` for recovery at the next SessionStart. |
+| Hook | Script | Behavior |
+|---|---|---|
+| **SessionStart** | `session-start.sh` | Checks gentle-ai binary, runs `gentle-ai doctor`, checks for codegraph |
+| **PostCompaction** | `post-compaction.sh` | Re-injects context after Claude compacts memory |
+| **UserPromptSubmit** | `user-prompt-submit.sh` | Refreshes skill registry, injects asset manifest and review status per prompt |
+| **PreToolUse** | `pre-tool-use.sh` | Classifies diff tier (LOW/MED/HIGH), classifies command safety, gates `git commit` |
+| **SubagentStop** | `subagent-stop.sh` | Handles subagent lifecycle cleanup |
+| **Stop** | `session-stop.sh` | Async post-session cleanup and review gate validation |
 
 ## Requirements
 
 - [Claude Code](https://claude.ai/code) — CLI or desktop app
 - [`gentle-ai`](https://github.com/Gentleman-Programming/gentle-ai) binary — resolved from
-  `plugin/claude-code/bin/gentle-ai` first, then `PATH`. To pin a specific version, place the
-  binary at `plugin/claude-code/bin/gentle-ai` (create the `bin/` directory; add it to `.gitignore`).
-- Python 3.x (for hook scripts)
+  `plugin/claude-code/bin/gentle-ai` first, then PATH. To pin a specific version, place the
+  binary at `plugin/claude-code/bin/gentle-ai` (create the `bin/` directory; add to `.gitignore`).
+- `bash` and `jq`
 
 Optional but recommended:
 
 - [`codegraph`](https://github.com/Gentleman-Programming/codegraph) — structural code intelligence (checked at SessionStart)
-- [`engram`](https://github.com/Gentleman-Programming/engram) — session memory (snapshot injection and save)
-- [`gga`](https://github.com/Gentleman-Programming/gga) — Gentleman Guardian Angel pre-commit hook (run `gga install` once per repo to set it up)
-
-## Installation
-
-```bash
-git clone https://github.com/Manuelcarbajal/gentle-ai-claude.git
-claude plugin install --directory gentle-ai-claude
-```
-
-Or add it to your `~/.claude/settings.json` directly:
-
-```json
-{
-  "enabledPlugins": {
-    "gentle-claude@gentle-claude": true
-  },
-  "extraKnownMarketplaces": {
-    "gentle-claude": {
-      "source": {
-        "path": "/path/to/gentle-ai-claude",
-        "source": "directory"
-      }
-    }
-  }
-}
-```
+- [`engram`](https://github.com/Gentleman-Programming/engram) — session memory via MCP
+- [`gga`](https://github.com/Gentleman-Programming/gga) — Gentleman Guardian Angel pre-commit hook
 
 ## How it works
 
-All hooks are Python scripts in `scripts/`. They fail-open — if any dependency (`gentle-ai`, `engram`, `gga`) is missing or times out, the hook exits cleanly without blocking Claude.
+All hooks are bash scripts under `plugin/claude-code/scripts/`. They fail-open — if any
+dependency (`gentle-ai`, `codegraph`, `jq`) is missing or times out, the hook exits cleanly
+without blocking Claude.
 
 Hook output follows the Claude Code hook protocol:
 - `systemMessage` for blocking/unmissable warnings
@@ -63,26 +55,62 @@ Hook output follows the Claude Code hook protocol:
 
 ## Review enforcement
 
-The PreToolUse hook blocks `git commit` and `git push` until a valid `gentle-ai` review receipt exists for the staged content. The full cycle is:
+`pre-tool-use.sh` classifies the staged diff before deciding whether to gate:
 
-```
+| Tier | Condition | Action |
+|---|---|---|
+| **LOW** | Only `.md`/`.txt`/`.rst`/`.adoc` staged | Skip gate entirely |
+| **MED** | All other changes | Validate pre-commit receipt |
+| **HIGH** | >400 changed lines or high-risk paths (auth, security, credentials…) | Validate pre-commit receipt |
+
+The full review cycle when required:
+
+```bash
 gentle-ai review start --cwd .
-# run 4R lenses (risk, resilience, readability, reliability)
+# run the appropriate lenses (1 for MED, 4R for HIGH)
 gentle-ai review finalize --cwd . --lineage <id> [--evidence <file>]
 gentle-ai review validate --gate pre-commit --cwd .
 git commit
 ```
 
+## Safety guards
+
+`pre-tool-use.sh` also classifies every `Bash` tool call:
+
+- **Block**: `rm -rf /`, `rm -rf /*`, force-push to main/master, `DROP TABLE/DATABASE/SCHEMA`, overwrite `.env`
+- **Confirm**: force-push to non-main, `git reset --hard`, recursive `rm -rf`
+- **Allow**: everything else
+
+## Skill registry injection
+
+On every prompt, `user-prompt-submit.sh` builds the skill context in three layers:
+
+1. **Official registry** — generated by `gentle-ai skill-registry refresh` (project + user paths)
+2. **Plugin skills** (`plugin/claude-code/skills/`) — Claude Code-specific overrides
+3. **Vendor skills** (`vendor/gentle-pi/skills/`) — platform-agnostic skills from gentle-pi
+
+Plugin skills take priority over same-named vendor skills via two-pass deduplication.
+
 ## Project structure
 
 ```
-.claude-plugin/plugin.json   Plugin metadata
-hooks/hooks.json             Hook declarations
-scripts/session-start.py     SessionStart hook
-scripts/user-prompt-submit.py UserPromptSubmit hook
-scripts/pre-tool-use.py      PreToolUse gate
-scripts/session-stop.py      Stop hook
-AGENTS.md                    GGA code review rules
+.claude-plugin/marketplace.json      Marketplace metadata
+plugin/claude-code/
+  .claude-plugin/plugin.json         Plugin metadata
+  hooks/hooks.json                   Hook declarations
+  scripts/
+    gentle_ai.sh                     Shared utilities (gentle_ai_bin, etc.)
+    session-start.sh                 SessionStart hook
+    post-compaction.sh               PostCompaction hook
+    user-prompt-submit.sh            UserPromptSubmit hook
+    pre-tool-use.sh                  PreToolUse gate
+    subagent-stop.sh                 SubagentStop hook
+    session-stop.sh                  Stop hook
+  skills/gentle-ai/SKILL.md          Claude Code harness identity skill
+  prompts/                           Claude Code adapted workflow prompts
+  tests/                             bats test suite (47 tests)
+vendor/gentle-pi/                    Sparse git submodule (skills, assets, contracts)
+AGENTS.md                            GGA code review rules
 ```
 
 ## License

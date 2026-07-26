@@ -305,11 +305,11 @@ Lo que gentle-claude necesita implementar (responsabilidad A):
 12. ❌ Startup banner — bajo, no hay equivalente nativo en Claude Code
 13. ❌ Model routing — bajo, conveniencia
 
-Pendiente para completar la integración del vendor:
-A. ❌ Registrar `vendor/gentle-pi/skills/` como fuente en `gentle-ai skill-registry`
-B. ❌ Actualizar `user-prompt-submit.sh` para lazy-load de `vendor/gentle-pi/assets/`
-C. ❌ CI/CD: `ci.yml` (bats) + `release.yml` (tag → GitHub Release)
-D. ❌ Docs: `DEVELOPMENT.md`, `ARCHITECTURE.md`, `CHANGELOG.md`
+Vendor integration — all complete:
+A. ✅ Vendor skills injected via `inject_adapter_skills()` in `user-prompt-submit.sh`
+B. ✅ Vendor assets lazy-loaded via `inject_asset_manifest()` in `user-prompt-submit.sh`
+C. ✅ CI/CD: `ci.yml` (bats on every PR) + `release.yml` (tag → GitHub Release)
+D. ✅ Docs: `DEVELOPMENT.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md`, `CONTRIBUTING.md`
 
 ---
 
