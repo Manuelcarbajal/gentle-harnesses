@@ -428,11 +428,22 @@ local.
       árbitro único
 
 ### Fase 4 — Fuente única para `classify_command()`
-Depende de coordinación con el mantenedor de gentle-ai — más lento, se planifica pero no
-bloquea el resto.
+Depende de coordinación con el mantenedor de gentle-ai (org `Gentleman-Programming`, sin
+relación con el dueño de este repo) — sin canal de comunicación real ni track record para que
+una propuesta cross-repo prospere hoy.
 
 - [ ] Proponer a gentle-ai una lista canónica versionada de patrones peligrosos (JSON/YAML)
 - [ ] Consumida tanto por gentle-claude como por gentle-pi
+
+**Intentado y revertido (2026-07-26):** se probó re-acotar la fase a una extracción local —
+`classify_command()` leyendo un `command-risk-patterns.json` propio vía `jq`, en vez de las 8
+reglas en bash. Funcionaba (55/55 tests) pero se descartó tras pesar costo/beneficio: no
+resuelve la duplicación real con gentle-pi (el problema que le da origen a esta fase), y
+`classify_command()` corre en **todo** comando de Bash de este repo (no solo los riesgosos),
+así que el rediseño le agregaba hasta ~33 forks de `jq` por invocación al hot path de cada
+comando — costo medible en Windows, a cambio de un beneficio de mantenibilidad menor (8 reglas
+fijas que casi no cambian). Se revirtió a bash inline. No vale la pena resolver esta fase en
+solitario; queda parqueada hasta que haya coordinación real con gentle-ai.
 
 ### Fase 5 — Limpieza de vendor/
 Bajo riesgo, alto valor de claridad — se hace en paralelo a lo anterior.
