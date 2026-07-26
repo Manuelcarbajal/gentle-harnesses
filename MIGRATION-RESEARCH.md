@@ -407,12 +407,12 @@ Note on skills/gentle-ai: local `plugin/claude-code/skills/gentle-ai/SKILL.md` d
 
 - [x] `git submodule add https://github.com/Gentleman-Programming/gentle-pi.git vendor/gentle-pi`
       with sparse checkout: `git sparse-checkout set skills prompts contracts assets`
-- [ ] Register `vendor/gentle-pi/skills/` as a skill source in `gentle-ai skill-registry` config
-      so the registry discovers vendor skills automatically on session start — this unlocks
-      `release`, `cognitive-doc-design`, and `comment-writer` without any local copies
-- [ ] Add Pi-context filter to `skills/gentle-ai/SKILL.md`: one section clarifying that vendor
-      assets come from gentle-pi and that references to `subagent_run`, `~/.pi`, Pi TUI, or
-      `pi install` do not apply in Claude Code context — no copies, no adapter scripts
+- [x] Register vendor skills via `inject_adapter_skills()` in `user-prompt-submit.sh`:
+      reads official registry first (gentle-ai as primary source), then appends plugin/
+      and vendor/gentle-pi/skills/ rows with scope "plugin"/"adapter". Deduplicates by
+      name — local plugin skill wins over same-named vendor skill. Encapsulated in one
+      removable function if gentle-ai adds native vendor/ support.
+- [x] Add Pi-context filter to `skills/gentle-ai/SKILL.md`
 - [ ] Document in `DEVELOPMENT.md`: `git submodule update --remote` to pull latest gentle-pi
 
 ### Phase 7 — Orchestrator Assets & Chains ✅ (via vendor)
