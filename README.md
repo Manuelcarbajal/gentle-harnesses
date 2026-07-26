@@ -110,7 +110,7 @@ plugin/claude-code/
   scripts/
     gentle_ai.sh                     Shared utilities (gentle_ai_bin, etc.)
     session-start.sh                 SessionStart hook
-    post-compaction.sh               SessionStart hook (matcher: compact)
+    post-compaction.sh               PostCompaction hook
     user-prompt-submit.sh            UserPromptSubmit hook
     pre-tool-use.sh                  PreToolUse gate
     subagent-stop.sh                 SubagentStop hook
@@ -118,8 +118,8 @@ plugin/claude-code/
   skills/gentle-ai/SKILL.md          Claude Code harness identity skill
   prompts/                           Claude Code adapted workflow prompts
   tests/                             bats test suite (47 tests)
-  AGENTS.md                          GGA code review rules (this harness only)
 vendor/gentle-pi/                    Sparse git submodule (skills, assets, contracts, docs, prompts)
+AGENTS.md                            GGA code review rules
 ```
 
 ## License
