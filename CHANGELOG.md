@@ -7,6 +7,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0-beta.3] - 2026-07-26
+
+### Fixed
+
+- **Post-compaction recovery never fired** — `post-compaction.sh` read a `trigger` field
+  that Claude Code never sends (the real `SessionStart` payload field is `source`) and
+  compared it against `"post_compact"` instead of the real value `"compact"`; the hook
+  silently no-op'd on every session. Rewritten to parse `source` via `jq` and added
+  `"matcher": "compact"` to its `hooks.json` entry so it only runs on compaction.
+- **Documentation audit** — corrected install instructions across README/CONTRIBUTING
+  (`claude plugin install --directory` is not a real flag; replaced with
+  `plugin marketplace add` + `plugin install <name>@<marketplace>`), fixed the
+  vendor sparse-checkout listing and `plugin.json` path references in
+  ARCHITECTURE/DEVELOPMENT, and documented the marketplace `source` `./`-prefix
+  requirement and immutable-tag convention in DEVELOPMENT.md
+
+### Added
+
+- **NOTICE** — formal MIT attribution for gentle-pi (Copyright Mario Zechner), covering
+  the vendored submodule and the prompts/skill adapted from it
+
+---
+
 ## [0.2.0-beta.2] - 2026-07-25
 
 ### Fixed
