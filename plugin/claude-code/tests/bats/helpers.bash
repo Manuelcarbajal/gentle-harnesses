@@ -7,13 +7,18 @@ load "$BATS_LIB_DIR/bats-assert/load"
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts" && pwd)"
 
+# Resolved once, at load time, before setup() narrows PATH for each test —
+# works on both the dev machine (jq under ~/.local/bin) and CI (jq under /usr/bin).
+REAL_JQ="$(command -v jq || true)"
+
 setup() {
     STUB_DIR="$(mktemp -d)"
     export STUB_DIR
 
     # Use a controlled minimal PATH so real gentle-ai/codegraph are not found
-    # unless a stub is explicitly created.  jq lives at ~/.local/bin which is
-    # always prepended; standard POSIX tools come from /usr/bin and /bin.
+    # unless a stub is explicitly created. jq is served via create_stub_jq,
+    # which delegates to REAL_JQ resolved above; standard POSIX tools come
+    # from /usr/bin and /bin.
     export PATH="$HOME/.local/bin:$STUB_DIR:/usr/bin:/bin:/usr/local/bin"
 
     # On Windows/Git Bash, git.exe lives here — needed for passthrough in stubs
@@ -156,12 +161,14 @@ STUB_EOF
 }
 
 create_stub_jq() {
-    cat > "$STUB_DIR/jq" << 'STUB_EOF'
+    if [ -z "$REAL_JQ" ]; then
+        echo "create_stub_jq: no real jq found on PATH — install jq before running tests" >&2
+        return 1
+    fi
+    cat > "$STUB_DIR/jq" << EOF
 #!/usr/bin/env bash
-exec "$HOME/.local/bin/jq" "$@"
-STUB_EOF
-    # Substitute $HOME literally in the stub
-    sed -i "s|\$HOME|$HOME|g" "$STUB_DIR/jq"
+exec "$REAL_JQ" "\$@"
+EOF
     chmod +x "$STUB_DIR/jq"
 }
 

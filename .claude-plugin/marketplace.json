@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "gentle-claude",
-      "source": "plugin/claude-code",
+      "source": "./plugin/claude-code",
       "description": "gentle-ai ecosystem hooks for Claude Code: skill registry injection, review lifecycle enforcement, and session continuity via Engram."
     }
   ]

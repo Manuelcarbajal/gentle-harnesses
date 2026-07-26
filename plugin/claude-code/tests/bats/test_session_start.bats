@@ -10,7 +10,7 @@ load "helpers"
     run bash "$SCRIPTS_DIR/session-start.sh"
     assert_success
     # Verify output is valid JSON
-    echo "$output" | "$HOME/.local/bin/jq" -e . > /dev/null
+    echo "$output" | jq -e . > /dev/null
 }
 
 @test "healthy ecosystem outputs hookSpecificOutput" {
