@@ -1,5 +1,8 @@
 # Code Review Rules
 
+Scoped to the gentle-claude (Claude Code) harness adapter. Other harness adapters under
+`plugin/` get their own `AGENTS.md` with rules specific to their own stack.
+
 ## Hook scripts (bash)
 
 - Source `gentle_ai.sh` for shared utilities — never duplicate `gentle_ai_bin()` or logging helpers
