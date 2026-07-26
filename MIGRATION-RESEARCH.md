@@ -434,8 +434,10 @@ Pi-specific reference counts per file:
 - [x] `assets/chains/sdd-full.chain.md` — available via vendor (zero Pi refs)
 - [x] `assets/chains/sdd-plan.chain.md` — available via vendor (zero Pi refs)
 - [x] `assets/chains/sdd-verify.chain.md` — available via vendor (zero Pi refs)
-- [ ] Update `user-prompt-submit.sh` to lazy-load from `vendor/gentle-pi/assets/` instead of
-      hardcoding orchestrator behavior in CLAUDE.md
+- [x] Update `user-prompt-submit.sh` to lazy-load from `vendor/gentle-pi/assets/`:
+      `inject_asset_manifest()` emits a path manifest per prompt (not file content).
+      Agents read the asset file when the workflow applies — nothing is preloaded eagerly.
+      orchestrator.md excluded (Pi-specific); sub-assets and chains are platform-agnostic.
 
 ---
 

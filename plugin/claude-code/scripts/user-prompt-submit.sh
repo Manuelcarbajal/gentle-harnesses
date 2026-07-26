@@ -33,6 +33,34 @@ adapter_skill_rows() {
 # Priority: plugin skills override vendor skills of the same name.
 # REMOVE this function if gentle-ai adds native support for these paths.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# inject_asset_manifest: emit a lightweight path manifest for vendor assets.
+# Agents read the file when the workflow applies — no content injected eagerly.
+# REMOVE this function if gentle-ai adds native asset path injection.
+# ---------------------------------------------------------------------------
+inject_asset_manifest() {
+    local assets_dir="$ADAPTER_ROOT/vendor/gentle-pi/assets"
+    [ -d "$assets_dir" ] || return 0
+
+    local lines=""
+    _asset_row() {
+        local label="$1" path="$2"
+        [ -f "$path" ] && lines="${lines}\n- ${label}: \`${path}\`"
+    }
+
+    _asset_row "Delegation rules"    "$assets_dir/orchestrator-delegation.md"
+    _asset_row "Memory protocol"     "$assets_dir/orchestrator-memory.md"
+    _asset_row "Skills discovery"    "$assets_dir/orchestrator-skills.md"
+    _asset_row "SDD workflow"        "$assets_dir/sdd-orchestrator-workflow.md"
+    _asset_row "Chain — 4R review"   "$assets_dir/chains/4r-review.chain.md"
+    _asset_row "Chain — SDD full"    "$assets_dir/chains/sdd-full.chain.md"
+    _asset_row "Chain — SDD plan"    "$assets_dir/chains/sdd-plan.chain.md"
+    _asset_row "Chain — SDD verify"  "$assets_dir/chains/sdd-verify.chain.md"
+
+    [ -z "$lines" ] && return 0
+    printf '## Adapter Assets\n\nLoad the file when the workflow applies — do not preload.\n%b\n' "$lines"
+}
+
 inject_adapter_skills() {
     local registry="$1"
     local plugin_dir="$ADAPTER_ROOT/plugin/claude-code/skills"
@@ -85,9 +113,12 @@ if [ -n "$action" ]; then
     fi
 fi
 
+asset_manifest=$(inject_asset_manifest)
+
 parts=()
-[ -n "$registry" ] && parts+=("## Gentle-AI Skill Registry\n\n${registry}")
-[ -n "$review_summary" ] && parts+=("## Review Lifecycle\n\n${review_summary}")
+[ -n "$registry" ]        && parts+=("## Gentle-AI Skill Registry\n\n${registry}")
+[ -n "$asset_manifest" ]  && parts+=("${asset_manifest}")
+[ -n "$review_summary" ]  && parts+=("## Review Lifecycle\n\n${review_summary}")
 
 if [ ${#parts[@]} -eq 0 ]; then
     exit 0
