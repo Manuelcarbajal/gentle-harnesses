@@ -7,6 +7,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0-beta.4] - 2026-07-26
+
+### Changed
+
+- **Repo/marketplace renamed to `gentle-harnesses`** — the repo hosts gentle-ai harness
+  adapters for coding-agent CLIs/editors generally, not just Claude Code; `gentle-ai-claude`
+  undersold that. The `gentle-claude` plugin's own `name` is unchanged (it's the stable
+  install identifier), so existing installs keep working — only the marketplace identifier
+  changed: `gentle-claude@gentle-claude` -> `gentle-claude@gentle-harnesses`.
+- **`AGENTS.md` / `CLAUDE.md` restructured** — root `AGENTS.md` now holds the repo-wide,
+  tool-agnostic facts (structure, conventions, dependencies) that any coding agent (Codex,
+  Cursor, etc.) can read natively; root `CLAUDE.md` is a thin `@AGENTS.md` import plus the
+  one genuinely Claude-Code-specific note, per Anthropic's own documented pattern for
+  avoiding duplication between the two files. `plugin/claude-code/AGENTS.md` keeps the
+  bash/bats review rules that are specific to this one harness, and `gga`'s `RULES_FILE`
+  points at it.
+
+### Fixed
+
+- **Stale GitHub templates** — `.github/pull_request_template.md` and
+  `.github/ISSUE_TEMPLATE/bug_report.md` still referenced pre-migration Python script paths
+  and `pytest`; updated to the current bash paths under `plugin/claude-code/` and `bats`.
+
+---
+
 ## [0.2.0-beta.3] - 2026-07-26
 
 ### Fixed
