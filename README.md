@@ -1,6 +1,10 @@
-# gentle-claude
+# gentle-harnesses
 
-A [Claude Code](https://claude.ai/code) plugin that wires the [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) ecosystem into your Claude sessions — ecosystem health checks, skill registry injection, review lifecycle enforcement, and session continuity via Engram.
+Harness adapters that wire the [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) ecosystem
+into different coding-agent CLIs and editors. Today that means `gentle-claude`, a
+[Claude Code](https://claude.ai/code) plugin — ecosystem health checks, skill registry
+injection, review lifecycle enforcement, and session continuity via Engram. More harness
+adapters land here as separate plugin entries in the same marketplace.
 
 Mirrors what [gentle-pi](https://github.com/Gentleman-Programming/gentle-pi) does for the Pi coding agent.
 gentle-pi is vendored as a submodule and some of its prompts/skills are adapted here for
@@ -9,17 +13,17 @@ Claude Code — see [NOTICE](./NOTICE) for attribution.
 ## Installation
 
 ```bash
-claude plugin marketplace add Manuelcarbajal/gentle-ai-claude
-claude plugin install gentle-claude@gentle-claude
+claude plugin marketplace add Manuelcarbajal/gentle-harnesses
+claude plugin install gentle-claude@gentle-harnesses
 ```
 
 Or clone and install manually:
 
 ```bash
-git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-ai-claude.git
-cd gentle-ai-claude
+git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-harnesses.git
+cd gentle-harnesses
 claude plugin marketplace add .
-claude plugin install gentle-claude@gentle-claude
+claude plugin install gentle-claude@gentle-harnesses
 ```
 
 ## What it does

@@ -1,21 +1,28 @@
-# gentle-claude
+# gentle-harnesses
 
-Claude Code plugin that integrates the gentle-ai ecosystem: skill registry injection,
-review lifecycle hooks, and ecosystem health checks at session boundaries.
+Home for gentle-ai ecosystem harness adapters — bash hook scripts that wire skill registry
+injection, review lifecycle enforcement, and ecosystem health checks into different
+coding-agent CLIs and editors. `gentle-claude` (Claude Code) is the only adapter today;
+more land as sibling directories under `plugin/`.
 
 ## What this repo is
 
-This is a `.claude-plugin` package loaded by Claude Code as `gentle-claude@gentle-claude`.
-It wires gentle-ai workflows into Claude Code via hooks — mirroring what `gentle-pi` does
-for Pi, and what `gga` wraps for the GGA agent.
+`plugin/claude-code/` is a `.claude-plugin` package loaded by Claude Code as
+`gentle-claude@gentle-harnesses`. It wires gentle-ai workflows into Claude Code via hooks —
+mirroring what `gentle-pi` does for Pi, and what `gga` wraps for the GGA agent.
 
 ## Structure
 
-- `.claude-plugin/plugin.json` — plugin metadata (name, version, author)
-- `hooks/hooks.json` — declares SessionStart, UserPromptSubmit, and Stop hooks
-- `scripts/session-start.py` — ecosystem health check (gentle-ai + codegraph)
-- `scripts/user-prompt-submit.py` — injects skill registry + review lifecycle as context
-- `scripts/session-stop.py` — validates review gate post-apply
+- `.claude-plugin/marketplace.json` — marketplace catalog (repo root, lists all plugin entries)
+- `plugin/claude-code/.claude-plugin/plugin.json` — gentle-claude plugin metadata (name, version, author)
+- `plugin/claude-code/hooks/hooks.json` — declares SessionStart, UserPromptSubmit, PreToolUse, SubagentStop, and Stop hooks
+- `plugin/claude-code/scripts/session-start.sh` — ecosystem health check (gentle-ai + codegraph)
+- `plugin/claude-code/scripts/user-prompt-submit.sh` — injects skill registry + review lifecycle as context
+- `plugin/claude-code/scripts/pre-tool-use.sh` — safety guard + risk-based review gate
+- `plugin/claude-code/scripts/post-compaction.sh` — context recovery after compaction
+- `plugin/claude-code/scripts/subagent-stop.sh` — passive subagent memory capture
+- `plugin/claude-code/scripts/session-stop.sh` — validates review gate post-apply
+- `vendor/gentle-pi/` — sparse git submodule (skills, prompts, contracts, assets, docs); see `NOTICE`
 
 ## Conventions
 
@@ -28,4 +35,4 @@ for Pi, and what `gga` wraps for the GGA agent.
 
 - `gentle-ai` binary in PATH (managed via gentle-ai ecosystem)
 - `codegraph` binary in PATH (separate install — checked by SessionStart hook)
-- Python 3.x for hook scripts
+- `bash` and `jq` for hook scripts — no Python runtime required

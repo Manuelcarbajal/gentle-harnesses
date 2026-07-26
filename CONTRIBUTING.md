@@ -15,10 +15,10 @@ Optional but tested against:
 ## Local install
 
 ```bash
-git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-ai-claude.git
-cd gentle-ai-claude
+git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-harnesses.git
+cd gentle-harnesses
 claude plugin marketplace add .
-claude plugin install gentle-claude@gentle-claude
+claude plugin install gentle-claude@gentle-harnesses
 ```
 
 To reload after editing a hook script:

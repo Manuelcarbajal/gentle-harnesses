@@ -14,8 +14,8 @@
 ## Clone
 
 ```bash
-git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-ai-claude
-cd gentle-ai-claude
+git clone --recurse-submodules https://github.com/Manuelcarbajal/gentle-harnesses
+cd gentle-harnesses
 ```
 
 If you cloned without `--recurse-submodules`:

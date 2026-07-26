@@ -15,15 +15,18 @@ All changes must go through the gentle-ai review cycle before merging.
 ## How the hook was tested
 
 <!-- Describe how you verified the hook behaves correctly:
-     - Unit tests added/updated (pytest)
+     - Unit tests added/updated (bats)
      - Manual test with `claude --debug`
      - Edge cases covered -->
 
 ## Files changed
 
-- [ ] `scripts/session-start.py`
-- [ ] `scripts/user-prompt-submit.py`
-- [ ] `scripts/pre-tool-use.py`
-- [ ] `scripts/session-stop.py`
-- [ ] `hooks/hooks.json`
-- [ ] `.claude-plugin/plugin.json`
+- [ ] `plugin/claude-code/scripts/session-start.sh`
+- [ ] `plugin/claude-code/scripts/user-prompt-submit.sh`
+- [ ] `plugin/claude-code/scripts/pre-tool-use.sh`
+- [ ] `plugin/claude-code/scripts/post-compaction.sh`
+- [ ] `plugin/claude-code/scripts/subagent-stop.sh`
+- [ ] `plugin/claude-code/scripts/session-stop.sh`
+- [ ] `plugin/claude-code/hooks/hooks.json`
+- [ ] `plugin/claude-code/.claude-plugin/plugin.json`
+- [ ] `.claude-plugin/marketplace.json`

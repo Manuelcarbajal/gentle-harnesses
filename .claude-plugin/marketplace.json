@@ -1,6 +1,6 @@
 {
-  "name": "gentle-claude",
-  "description": "gentle-ai ecosystem for Claude Code: skill registry injection, review lifecycle hooks, and ecosystem health checks at session boundaries.",
+  "name": "gentle-harnesses",
+  "description": "gentle-ai ecosystem harness adapters for coding agent CLIs and editors — Claude Code today, more harnesses to come.",
   "owner": {
     "name": "Manuel Carbajal",
     "url": "https://github.com/Manuelcarbajal"

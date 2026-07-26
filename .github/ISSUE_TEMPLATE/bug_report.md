@@ -23,7 +23,7 @@ labels: bug
 - Claude Code version: <!-- run `claude --version` -->
 - gentle-ai version: <!-- run `gentle-ai --version` -->
 - OS: <!-- e.g. macOS 14, Windows 11, Ubuntu 22.04 -->
-- Python version: <!-- run `python --version` -->
+- bash / jq version: <!-- run `bash --version` and `jq --version` -->
 
 ## Hook output
 
