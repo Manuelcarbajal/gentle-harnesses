@@ -379,29 +379,33 @@ is hardcoded in a monolithic CLAUDE.md loaded every session regardless of need.
 - [x] Create `prompts/gis.md` — issue creation with issue-first methodology.
 - [x] Create `prompts/gwr.md` — work review prompt.
 
-### Phase 4c — gentle-pi as Submodule ❌
+### Phase 4c — gentle-pi as Submodule ✅ (partial)
 Skills in gentle-pi (`skills/`, `prompts/`, `contracts/`) are LLM-first and platform-agnostic —
 they work in Claude Code without modification. Instead of duplicating them, gentle-claude references
 gentle-pi directly as a git submodule so updates flow in with one command.
 
-What's useful for Claude (platform-agnostic):
-- `skills/` — branch-pr, chained-pr, cognitive-doc-design, comment-writer, gentle-ai,
-  issue-creation, judgment-day, release, skill-creator, skill-improver, skill-registry,
-  work-unit-commits, _shared/review-ledger-contract.md
-- `prompts/` — gcl.md, gis.md, gpr.md, gwr.md, skill-creation.md
-- `contracts/review-integration/v1/` — review integration contract
+Sparse checkout — only materializes the 3 directories applicable to Claude Code:
+  `vendor/gentle-pi/skills/`, `vendor/gentle-pi/prompts/`, `vendor/gentle-pi/contracts/`
 
-What's Pi-specific (not applicable to Claude):
-- `extensions/` — TypeScript Pi runtime extensions (startup-banner, pi-pretty, quiet-tools, etc.)
-- `lib/` — TypeScript review library implementation
-- `scripts/` — Node.js build/installer scripts (gentle-pi is an npm package; gentle-claude is not)
-- `runtime/`, `themes/`, `openspec/` — Pi internal infrastructure
+What's in vendor/gentle-pi/skills/ (now available without duplication):
+  branch-pr, chained-pr, cognitive-doc-design, comment-writer, gentle-ai (Pi version — differs
+  from local), issue-creation, judgment-day, release ← was ❌, now accessible via vendor
+  skill-creator, skill-improver, skill-registry, work-unit-commits, _shared/
 
-- [ ] `git submodule add https://github.com/Gentleman-Programming/gentle-pi.git vendor/gentle-pi`
-- [ ] Update `user-prompt-submit.sh` to inject skills from `vendor/gentle-pi/skills/` instead of
-      any local copies — zero duplication
-- [ ] Update `user-prompt-submit.sh` to inject prompts from `vendor/gentle-pi/prompts/`
-- [ ] Document in `DEVELOPMENT.md`: run `git submodule update --remote` to pull latest gentle-pi
+Note on prompts: vendor prompts are NOT replacements for local ones.
+  - `vendor/gentle-pi/prompts/` — Pi-specific (hardcoded mono-repo paths: packages/ai/, etc.)
+  - `plugin/claude-code/prompts/` — Claude Code adapted versions; these stay as-is
+
+Note on skills/gentle-ai: local `plugin/claude-code/skills/gentle-ai/SKILL.md` defines the
+  Claude Code harness identity. The vendor version defines the Pi harness. Both stay — different
+  identities for different platforms.
+
+- [x] `git submodule add https://github.com/Gentleman-Programming/gentle-pi.git vendor/gentle-pi`
+      with sparse checkout: `git sparse-checkout set skills prompts contracts`
+- [ ] Register `vendor/gentle-pi/skills/` as a skill source in `gentle-ai skill-registry` config
+      so the registry discovers vendor skills automatically on session start — this unlocks
+      `release`, `cognitive-doc-design`, and `comment-writer` without any local copies
+- [ ] Document in `DEVELOPMENT.md`: `git submodule update --remote` to pull latest gentle-pi
 
 ### Phase 7 — Orchestrator Assets & Chains ❌
 Reduces CLAUDE.md bloat via modular lazy-loading. Mirrors `assets/` structure in gentle-pi.
