@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract changelog entry
+        id: changelog
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          awk "/^## \[$version\]/{found=1; next} found && /^## /{exit} found{print}" CHANGELOG.md \
+            > release-notes.txt
+          if [ ! -s release-notes.txt ]; then
+            echo "No changelog entry found for v$version — using Unreleased section."
+            awk '/^## \[Unreleased\]/{found=1; next} found && /^## /{exit} found{print}' CHANGELOG.md \
+              > release-notes.txt
+          fi
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.version.outputs.version }}
+          body_path: release-notes.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
