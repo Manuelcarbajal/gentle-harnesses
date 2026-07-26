@@ -157,20 +157,24 @@ asignando el menor número de lenses posible según el riesgo real del diff.
 | **MEDIUM** | Todo lo demás (default) | 1 lens — el de mayor riesgo dominante |
 | **HIGH** | >400 líneas modificadas O paths de riesgo alto | 4 lenses completos (4R) |
 
-**Señales de riesgo alto (paths):**
-- Frases: `data-exposure`, `data-loss`, `privilege-escalation`
-- Tokens: `auth`, `security`, `payments`, `permissions`, `shell`, `secrets`, `credentials`, `tokens`, `update`
+**Señales de riesgo alto (paths) — dos mecanismos:**
+- Frases (regex): `data[-_/ ]?(?:exposure|loss)|privilege[-_/ ]?escalation`
+- Tokens (cualquier segmento del path): `auth|authentication|authorization|update|updater|security|payments?|permissions?|shell|process|secrets?|credentials?|tokens?`
 
-**Para MEDIUM — lens dominante (orden de prioridad):**
-```
-risk > resilience > reliability > readability
-```
+**Para MEDIUM — lens dominante (orden de prioridad exacto):**
+
+| Prioridad | Lens | Señales de path |
+|---|---|---|
+| 1 | `review-risk` | cualquier token/frase de riesgo alto |
+| 2 | `review-resilience` | `update\|deploy\|deployment\|infra\|infrastructure\|ops\|migrations?\|rollback\|recovery` |
+| 3 | `review-reliability` | `tests?\|specs?\|runtime\|api` o extensiones `.test`/`.spec` |
+| 4 | `review-readability` | fallback por defecto |
 
 **Budget de corrección:** `min(200, ceil(originalChangedLines / 2))`
 
 **Lo que esto significa para gentle-claude:**
-El hook `pre-tool-use.py` actualmente bloquea en git commit/push sin discriminar el tamaño
-ni el riesgo del cambio. Con este modelo, podría evaluar el diff antes de decidir si pedir
+El hook `pre-tool-use.sh` actualmente bloquea en git commit/push sin discriminar el tamaño
+ni el riesgo del cambio. Con este modelo, evalúa el diff antes de decidir si pedir
 review completo (4R), review mínimo (1 lens) o dejar pasar sin review (solo docs).
 Reduce drásticamente el consumo de tokens en cambios triviales.
 
@@ -194,10 +198,10 @@ Lo que gentle-pi tiene como adapter. Marcado por responsabilidad:
 | Feature | gentle-pi | gentle-claude | Responsabilidad |
 |---|---|---|---|
 | SessionStart startup | ✅ | ✅ | A |
-| SessionStart compact (post-compaction) | ✅ | ❌ | A |
+| SessionStart compact (post-compaction) | ✅ | ✅ | A |
 | UserPromptSubmit | ✅ | ✅ | A |
-| SubagentStop | ✅ | ❌ | A |
-| Stop (async) | ✅ async | ✅ sync | A |
+| SubagentStop | ✅ | ✅ | A |
+| Stop (async) | ✅ async | ✅ async | A |
 
 ### Distribución e instalación
 
@@ -284,58 +288,107 @@ Lo que gentle-pi tiene como adapter. Marcado por responsabilidad:
 
 ### Resumen de gaps reales del adapter
 
-Lo que gentle-claude necesita implementar (responsabilidad A, actualmente ausente):
+Lo que gentle-claude necesita implementar (responsabilidad A):
+**✅ = implementado | ❌ = pendiente**
 
-1. `marketplace.json` — **crítico**, sin esto no existe en el marketplace
-2. Binary local — **crítico**, elimina el mayor punto de falla en instalación
-3. post-compaction hook — **importante**, recupera contexto perdido
-4. SubagentStop hook — **importante**, captura pasiva de memoria
-5. Risk-based lens routing — **importante**, ahorra tokens en cambios triviales
-6. Safety guards completos — **medio**, actualmente solo bloquea git
-7. Orchestrator assets separados — **medio**, mejor mantenibilidad que un CLAUDE.md monolítico
-8. Chains — **medio**, shortcuts de workflow
-9. `release` skill — **bajo**, faltante en el catálogo
-10. Startup banner — **bajo**, polish
-11. Model routing — **bajo**, conveniencia
+1. ✅ `marketplace.json` — crítico
+2. ❌ Binary local-first en `gentle_ai_bin()` — crítico, `$CLAUDE_PLUGIN_ROOT/bin/` antes de PATH
+3. ✅ post-compaction hook — importante
+4. ✅ SubagentStop hook — importante
+5. ❌ Risk-based lens routing en `pre-tool-use.sh` — importante, LOW/MED/HIGH
+6. ❌ Safety guards completos — medio, actualmente solo bloquea git commit/push
+7. ❌ `skills/gentle-ai/SKILL.md` — **importante**, define la identidad del harness como skill
+      inyectable; mayor impacto en token efficiency que cualquier otra optimización
+8. ❌ Prompts operacionales (`gpr`, `gcl`, `gis`, `gwr`) — importante, workflows específicos
+      con gentle-ai para PR review, changelog, issues — actualmente no existen
+9. ❌ Orchestrator assets separados — medio, `assets/` con lazy-loading vs CLAUDE.md monolítico
+10. ❌ Chains — medio, `4r-review`, `sdd-full`, `sdd-plan`, `sdd-verify`
+11. ❌ `release` skill — bajo
+12. ❌ Startup banner — bajo, polish (no equivalente nativo en Claude Code)
+13. ❌ Model routing — bajo, conveniencia
 
 ---
 
 ## Migration Checklist
 
-### Phase 0 — Foundations (do first)
-- [ ] Create `.claude-plugin/marketplace.json`
-- [ ] Tag v0.1.0 in git + create GitHub Release
+### Phase 0 — Foundations ✅
+- [x] Create `.claude-plugin/marketplace.json`
+- [x] Tag v0.1.0 in git + create GitHub Release
 - [ ] Add GitHub Topics: `gentle-ai`, `claude-code`, `plugin`, `review-lifecycle`, `skill-registry`
 - [ ] Write `CHANGELOG.md`
 
-### Phase 1 — Structure
-- [ ] Move plugin files under `plugin/claude-code/`
-- [ ] Keep root as project metadata (README, LICENSE, CONTRIBUTING, etc.)
-- [ ] Update `hooks/hooks.json` paths accordingly
+### Phase 1 — Structure ✅
+- [x] Move plugin files under `plugin/claude-code/`
+- [x] Keep root as project metadata (README, LICENSE, CONTRIBUTING, etc.)
+- [x] Update `hooks/hooks.json` paths accordingly
 
-### Phase 2 — Binary
-- [ ] Add `scripts/gentle-ai-binary.sh` — local binary resolution with fallback to PATH
-- [ ] Document binary version pinning strategy
+### Phase 2 — Binary ❌
+- [ ] Update `gentle_ai_bin()` in `gentle_ai.sh` to check `$CLAUDE_PLUGIN_ROOT/bin/gentle-ai` first,
+      fallback to `command -v gentle-ai` — mirrors `lib/gentle-ai-binary.ts` without SHA256 overhead
+- [ ] Document binary version pinning in README (which version ships bundled, how to override)
 
-### Phase 3 — Missing Hooks
-- [ ] Add `post-compaction.sh` (SessionStart compact matcher)
-- [ ] Add `subagent-stop.sh` (SubagentStop hook)
-- [ ] Make `session-stop.sh` async (non-blocking)
+### Phase 3 — Missing Hooks ✅
+- [x] Add `post-compaction.sh` (SessionStart compact matcher)
+- [x] Add `subagent-stop.sh` (SubagentStop hook)
+- [x] Make `session-stop.sh` async (non-blocking)
 
-### Phase 4 — Scripts Migration
-- [ ] Migrate `session-start.py` → `session-start.sh`
-- [ ] Migrate `user-prompt-submit.py` → `user-prompt-submit.sh`
-- [ ] Migrate `pre-tool-use.py` → `pre-tool-use.sh`
-- [ ] Migrate `session-stop.py` → `session-stop.sh`
-- [ ] Rewrite test suite for shell scripts
+### Phase 4 — Scripts Migration ✅
+- [x] Migrate `session-start.py` → `session-start.sh`
+- [x] Migrate `user-prompt-submit.py` → `user-prompt-submit.sh`
+- [x] Migrate `pre-tool-use.py` → `pre-tool-use.sh`
+- [x] Migrate `session-stop.py` → `session-stop.sh`
+- [ ] Rewrite test suite for shell scripts (bats) — currently still pytest
 
-### Phase 5 — CI/CD + Docs
-- [ ] GitHub Actions: `test.yml` (pytest/bats on every PR)
-- [ ] GitHub Actions: `release.yml` (tag → GitHub Release)
+### Phase 4b — Risk Routing & Safety Guards ❌
+Derived from `lib/review-risk.ts` and `extensions/gentle-ai.ts` (`classifyGuardedCommand`).
+
+- [ ] Implement LOW/MED/HIGH classification in `pre-tool-use.sh`:
+      - Get diff stat before blocking (lines changed + paths)
+      - LOW (only docs, no config, no binaries) → skip review gate entirely
+      - MED → require 1 dominant lens via `gentle-ai review start`
+      - HIGH (>400 lines OR high-risk path tokens) → require 4R
+- [ ] Expand safety guards beyond git:
+      - Hard-deny: `rm -rf /`, `git push --force` to main/master, `DROP TABLE`, credential writes
+      - Confirm: any `git push --force` (non-main), file deletes, `git reset --hard`
+      - Allow: everything else
+
+### Phase 5 — CI/CD + Docs ❌
+- [ ] GitHub Actions: `ci.yml` (bats + pytest on every PR, matching gentle-pi's `pnpm test` pattern)
+- [ ] GitHub Actions: `release.yml` (tag → GitHub Release, mirrors gentle-pi's `publish.yml`)
 - [ ] Write `ARCHITECTURE.md`
 - [ ] Write `DEVELOPMENT.md`
 - [ ] Write `SECURITY.md`
 - [ ] Write `ROADMAP.md`
+- [ ] Write `CHANGELOG.md`
+
+### Phase 6 — Harness Identity Skill & Prompts ❌
+**This is the biggest token-efficiency gap.** gentle-pi defines the harness as a discoverable
+SKILL that the skill registry injects dynamically. gentle-claude has no equivalent — its behavior
+is hardcoded in a monolithic CLAUDE.md loaded every session regardless of need.
+
+- [ ] Create `skills/gentle-ai/SKILL.md` — defines what gentle-claude IS as a harness:
+      identity, delegation rules, risk-based review, TDD protocol, SDD workflow pointer.
+      Gets auto-discovered by `gentle-ai skill-registry refresh` and injected into context.
+- [ ] Create `prompts/gpr.md` — PR review workflow (add label, read diff, verify changelog,
+      structured Good/Bad/Ugly output). Mirrors gentle-pi's `prompts/gpr.md`.
+- [ ] Create `prompts/gcl.md` — changelog audit before release (commits since last tag,
+      cross-package changelog verification). Mirrors gentle-pi's `prompts/gcl.md`.
+- [ ] Create `prompts/gis.md` — issue creation with issue-first methodology.
+- [ ] Create `prompts/gwr.md` — work review prompt.
+
+### Phase 7 — Orchestrator Assets & Chains ❌
+Reduces CLAUDE.md bloat via modular lazy-loading. Mirrors `assets/` structure in gentle-pi.
+
+- [ ] Create `assets/orchestrator.md` — thin harness layer with lazy-load pointers to other assets
+- [ ] Create `assets/orchestrator-delegation.md` — routing table + mandatory delegation triggers
+- [ ] Create `assets/orchestrator-memory.md` — engram lifecycle + SDD artifact keys per phase
+- [ ] Create `assets/orchestrator-skills.md` — skill discovery + registry protocol
+- [ ] Create `assets/chains/4r-review.chain.md`
+- [ ] Create `assets/chains/sdd-full.chain.md`
+- [ ] Create `assets/chains/sdd-plan.chain.md`
+- [ ] Create `assets/chains/sdd-verify.chain.md`
+- [ ] Update `user-prompt-submit.sh` to inject modular orchestrator assets instead of
+      relying on monolithic CLAUDE.md
 
 ---
 
