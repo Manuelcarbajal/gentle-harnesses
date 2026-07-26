@@ -384,8 +384,9 @@ Skills in gentle-pi (`skills/`, `prompts/`, `contracts/`) are LLM-first and plat
 they work in Claude Code without modification. Instead of duplicating them, gentle-claude references
 gentle-pi directly as a git submodule so updates flow in with one command.
 
-Sparse checkout — only materializes the 3 directories applicable to Claude Code:
-  `vendor/gentle-pi/skills/`, `vendor/gentle-pi/prompts/`, `vendor/gentle-pi/contracts/`
+Sparse checkout — only materializes the 4 directories applicable to Claude Code:
+  `vendor/gentle-pi/skills/`, `vendor/gentle-pi/prompts/`, `vendor/gentle-pi/contracts/`,
+  `vendor/gentle-pi/assets/`
 
 What's in vendor/gentle-pi/skills/ (now available without duplication):
   branch-pr, chained-pr, cognitive-doc-design, comment-writer, gentle-ai (Pi version — differs
@@ -401,25 +402,36 @@ Note on skills/gentle-ai: local `plugin/claude-code/skills/gentle-ai/SKILL.md` d
   identities for different platforms.
 
 - [x] `git submodule add https://github.com/Gentleman-Programming/gentle-pi.git vendor/gentle-pi`
-      with sparse checkout: `git sparse-checkout set skills prompts contracts`
+      with sparse checkout: `git sparse-checkout set skills prompts contracts assets`
 - [ ] Register `vendor/gentle-pi/skills/` as a skill source in `gentle-ai skill-registry` config
       so the registry discovers vendor skills automatically on session start — this unlocks
       `release`, `cognitive-doc-design`, and `comment-writer` without any local copies
+- [ ] Add Pi-context filter to `skills/gentle-ai/SKILL.md`: one section clarifying that vendor
+      assets come from gentle-pi and that references to `subagent_run`, `~/.pi`, Pi TUI, or
+      `pi install` do not apply in Claude Code context — no copies, no adapter scripts
 - [ ] Document in `DEVELOPMENT.md`: `git submodule update --remote` to pull latest gentle-pi
 
-### Phase 7 — Orchestrator Assets & Chains ❌
-Reduces CLAUDE.md bloat via modular lazy-loading. Mirrors `assets/` structure in gentle-pi.
+### Phase 7 — Orchestrator Assets & Chains ✅ (via vendor)
+Assets exist in `vendor/gentle-pi/assets/` — no local creation needed.
+Chains (4r-review, sdd-full, sdd-plan, sdd-verify) have zero Pi-specific references.
+Orchestrator files have marginal Pi refs (1–11 lines each) handled by the context filter in
+`skills/gentle-ai/SKILL.md` (see Phase 4c).
 
-- [ ] Create `assets/orchestrator.md` — thin harness layer with lazy-load pointers to other assets
-- [ ] Create `assets/orchestrator-delegation.md` — routing table + mandatory delegation triggers
-- [ ] Create `assets/orchestrator-memory.md` — engram lifecycle + SDD artifact keys per phase
-- [ ] Create `assets/orchestrator-skills.md` — skill discovery + registry protocol
-- [ ] Create `assets/chains/4r-review.chain.md`
-- [ ] Create `assets/chains/sdd-full.chain.md`
-- [ ] Create `assets/chains/sdd-plan.chain.md`
-- [ ] Create `assets/chains/sdd-verify.chain.md`
-- [ ] Update `user-prompt-submit.sh` to inject modular orchestrator assets instead of
-      relying on monolithic CLAUDE.md
+Pi-specific reference counts per file:
+  orchestrator.md: 5 | orchestrator-delegation.md: 11 | orchestrator-memory.md: 1
+  orchestrator-skills.md: 2 | sdd-orchestrator-workflow.md: 8
+  chains/4r-review.chain.md: 0 | chains/sdd-full.chain.md: 0
+
+- [x] `assets/orchestrator.md` — available at `vendor/gentle-pi/assets/orchestrator.md`
+- [x] `assets/orchestrator-delegation.md` — available via vendor
+- [x] `assets/orchestrator-memory.md` — available via vendor
+- [x] `assets/orchestrator-skills.md` — available via vendor
+- [x] `assets/chains/4r-review.chain.md` — available via vendor (zero Pi refs)
+- [x] `assets/chains/sdd-full.chain.md` — available via vendor (zero Pi refs)
+- [x] `assets/chains/sdd-plan.chain.md` — available via vendor (zero Pi refs)
+- [x] `assets/chains/sdd-verify.chain.md` — available via vendor (zero Pi refs)
+- [ ] Update `user-prompt-submit.sh` to lazy-load from `vendor/gentle-pi/assets/` instead of
+      hardcoding orchestrator behavior in CLAUDE.md
 
 ---
 
