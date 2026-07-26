@@ -420,10 +420,11 @@ Es la decisión que desbloquea todo el resto de la limpieza de `vendor/`.
 Elimina la duplicación más riesgosa (política de seguridad de review) sin perder el fail-safe
 local.
 
-- [ ] Hacer que `pre-tool-use.sh` invoque `gentle-ai review start` cuando corresponda (en vez
-      de sólo `validate`)
-- [ ] Usar el tier que la CLI devuelva
-- [ ] Dejar `classify_diff()` como fallback documentado si la CLI no responde — no como
+- [x] Hacer que `pre-tool-use.sh` lea el tier vía `gentle-ai review status` (read-only) cuando
+      exista una receipt aplicable — nunca invocar `review start` desde el gate (violaría el
+      contrato de `vendor/gentle-pi/docs/review-integration.md`)
+- [x] Usar el tier que la CLI devuelva
+- [x] Dejar `classify_diff()` como fallback documentado si la CLI no responde — no como
       árbitro único
 
 ### Fase 4 — Fuente única para `classify_command()`

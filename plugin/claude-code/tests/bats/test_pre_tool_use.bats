@@ -278,3 +278,50 @@ load "helpers"
     run bash "$SCRIPTS_DIR/pre-tool-use.sh"
     assert_success
 }
+
+# ---------------------------------------------------------------------------
+# Fase 3 — review status bridge (read-only)
+# ---------------------------------------------------------------------------
+
+@test "gentle-ai review status HIGH overrides classify_diff LOW: gate validates" {
+    create_stub_jq
+    create_stub_gentle_ai
+    create_stub_git
+    export STUB_GENTLE_AI_REVIEW_STATUS='{"applicability":"current_target","frozen":{"tier":"high"}}'
+    export STUB_GENTLE_AI_VALIDATE_EXIT=1
+    export STUB_GIT_NAMES="README.md"
+    export STUB_GIT_SHORTSTAT=" 1 file changed, 2 insertions(+)"
+    export CLAUDE_TOOL_NAME="Bash"
+    export CLAUDE_TOOL_INPUT='{"command":"git commit -m docs"}'
+    run bash "$SCRIPTS_DIR/pre-tool-use.sh"
+    assert_failure
+    assert_output --partial '"decision":"block"'
+}
+
+@test "gentle-ai review status LOW overrides classify_diff HIGH: gate skips validate" {
+    create_stub_jq
+    create_stub_gentle_ai
+    create_stub_git
+    export STUB_GENTLE_AI_REVIEW_STATUS='{"applicability":"current_target","frozen":{"tier":"low"}}'
+    export STUB_GENTLE_AI_VALIDATE_EXIT=1
+    export STUB_GIT_NAMES="src/auth/login.sh"
+    export STUB_GIT_SHORTSTAT=" 1 file changed, 5 insertions(+)"
+    export CLAUDE_TOOL_NAME="Bash"
+    export CLAUDE_TOOL_INPUT='{"command":"git commit -m feat"}'
+    run bash "$SCRIPTS_DIR/pre-tool-use.sh"
+    assert_success
+}
+
+@test "no applicable receipt falls back to classify_diff: doc-only skips gate" {
+    create_stub_jq
+    create_stub_gentle_ai
+    create_stub_git
+    export STUB_GENTLE_AI_REVIEW_STATUS='{"applicability":"ambiguous"}'
+    export STUB_GENTLE_AI_VALIDATE_EXIT=1
+    export STUB_GIT_NAMES="README.md CHANGELOG.md"
+    export STUB_GIT_SHORTSTAT=" 2 files changed, 10 insertions(+)"
+    export CLAUDE_TOOL_NAME="Bash"
+    export CLAUDE_TOOL_INPUT='{"command":"git commit -m docs"}'
+    run bash "$SCRIPTS_DIR/pre-tool-use.sh"
+    assert_success
+}

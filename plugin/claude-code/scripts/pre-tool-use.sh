@@ -23,6 +23,7 @@ cmd=$(printf '%s' "$tool_input" | jq -r '.command // ""' 2>/dev/null)
 # ---------------------------------------------------------------------------
 # classify_diff: returns LOW / MED / HIGH based on staged diff
 # ---------------------------------------------------------------------------
+# Fallback used when gentle_ai_review_tier finds no applicable receipt or the CLI is unavailable — the gate itself never starts a review.
 classify_diff() {
     local cwd="$1"
 
@@ -114,7 +115,7 @@ fi
 
 # Risk-based review gate for git commit
 if printf '%s' "$cmd" | grep -qE '(^|&&|\|\||;)[[:space:]]*git[[:space:]]+commit([[:space:]]|$)'; then
-    tier=$(classify_diff "$CWD")
+    tier=$(gentle_ai_review_tier "$CWD") || tier=$(classify_diff "$CWD")
     if [ "$tier" != "LOW" ]; then
         if ! gentle_ai_validate "pre-commit" "$CWD"; then
             printf '%s\n' '{"decision":"block","reason":"review gate denied: receipt missing or invalidated — run the review cycle first (gentle-ai review start)"}'

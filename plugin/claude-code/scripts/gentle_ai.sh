@@ -34,6 +34,28 @@ gentle_ai_validate() {
     return $rc
 }
 
+gentle_ai_review_tier() {
+    local cwd="$1"
+    local bin
+    bin=$(gentle_ai_bin)
+    [ -z "$bin" ] && return 1
+    local out
+    out=$(timeout 10 "$bin" review status --cwd "$cwd" \
+        --contract gentle-ai.review-integration/v1 \
+        --projection staged 2>/dev/null) || return 1
+    local applicability
+    applicability=$(printf '%s' "$out" | jq -r '.applicability // empty' 2>/dev/null)
+    [ "$applicability" != "current_target" ] && return 1
+    local tier
+    tier=$(printf '%s' "$out" | jq -r '.frozen.tier // empty' 2>/dev/null)
+    case "$tier" in
+        low) printf 'LOW' ;;
+        medium) printf 'MED' ;;
+        high) printf 'HIGH' ;;
+        *) return 1 ;;
+    esac
+}
+
 gentle_ai_review_status() {
     local cwd="$1"
     local bin
