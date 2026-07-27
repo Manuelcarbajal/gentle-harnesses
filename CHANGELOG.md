@@ -7,6 +7,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0-beta.7] - 2026-07-26
+
+### Fixed
+
+- **`release` skill silently bypassed the native `gentle-ai review validate --gate release`
+  check** — the gate requires five release-evidence inputs
+  (`--release-configuration`, `--release-provenance`, `--release-generated`,
+  `--release-publication-boundary`, `--release-evidence-freshness`) that the runbook never
+  supplied, so every past release skipped it. `plugin/claude-code/skills/release/SKILL.md` now
+  generates minimal, honest evidence reflecting this repo's actual release path (no build, git
+  commit/tag as provenance, GitHub Release via `release.yml` as the publication boundary, zero
+  generated artifacts) and validates the gate before tagging.
+
+---
+
 ## [0.2.0-beta.6] - 2026-07-26
 
 ### Changed
