@@ -7,6 +7,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0-beta.6] - 2026-07-26
+
+### Changed
+
+- **Pi context filter extended** — `skills/gentle-ai/SKILL.md` now also disambiguates
+  `gentle-ai-explore/worker/verify`, `pi-subagents`, `ask_user_question`, and
+  `/gentle:sdd-preflight` references found in vendor assets, extending the filter first
+  added in beta.1.
+
+### Fixed
+
+- **`CONTRIBUTING.md`** no longer references a nonexistent `log_info` helper — points at
+  `gentle_ai_review_status` instead.
+
+### Removed
+
+- Hardcoded developer-machine path and dead `python3`-stub scaffolding from
+  `tests/bats/helpers.bash`, leftover from the pre-bash-migration era.
+
+---
+
 ## [0.2.0-beta.5] - 2026-07-26
 
 ### Added
