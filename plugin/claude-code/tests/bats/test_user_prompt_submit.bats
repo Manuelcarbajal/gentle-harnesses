@@ -61,3 +61,16 @@ load "helpers"
     assert_success
     assert_output --partial 'action=in-progress'
 }
+
+@test "missing jq exits cleanly instead of leaking a raw shell error" {
+    # No create_stub_jq, and PATH excludes $HOME/.local/bin (where jq lives on
+    # this dev machine) — simulates the real Claude Code hook PATH, which does
+    # not include it. /usr/bin and /bin stay so cat/rm/tr (needed by bats'
+    # own teardown and the script) remain available.
+    export PATH="/usr/bin:/bin:/usr/local/bin"
+    # No gentle-ai stub, no registry file — vendor assets alone populate $parts,
+    # forcing the script down to the final printf | jq call.
+    run bash "$SCRIPTS_DIR/user-prompt-submit.sh"
+    assert_success
+    refute_output --partial "command not found"
+}

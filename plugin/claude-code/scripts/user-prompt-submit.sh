@@ -150,6 +150,10 @@ for i in "${!parts[@]}"; do
     fi
 done
 
-# jq builds the JSON to safely handle arbitrary content in registry/review strings
+# jq builds the JSON to safely handle arbitrary content in registry/review strings.
+# Without it we can't safely escape that content, so skip output instead of risking
+# malformed JSON or a raw "jq: command not found" leaking into the hook error stream.
+command -v jq >/dev/null 2>&1 || exit 0
+
 printf '%s' "$context" | jq -Rs \
     '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":.}}'
