@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.2.0-beta.11] - 2026-07-31
+
 ### Added
 
 - **`/gentle-review` skill — the supported native review path for Claude Code**
