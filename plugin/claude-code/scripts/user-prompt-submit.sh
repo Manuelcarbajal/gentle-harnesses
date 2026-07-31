@@ -48,21 +48,15 @@ inject_asset_manifest() {
         [ -f "$path" ] && lines="${lines}\n- ${label}: \`${path}\`"
     }
 
-    _asset_row "Delegation rules"      "$assets_dir/orchestrator-delegation.md"
-    _asset_row "Memory protocol"       "$assets_dir/orchestrator-memory.md"
-    _asset_row "Skills discovery"      "$assets_dir/orchestrator-skills.md"
-    _asset_row "SDD workflow"          "$assets_dir/sdd-orchestrator-workflow.md"
-    _asset_row "Chain — 4R review"     "$assets_dir/chains/4r-review.chain.md"
-    _asset_row "Chain — SDD full"      "$assets_dir/chains/sdd-full.chain.md"
-    _asset_row "Chain — SDD plan"      "$assets_dir/chains/sdd-plan.chain.md"
-    _asset_row "Chain — SDD verify"    "$assets_dir/chains/sdd-verify.chain.md"
-    _asset_row "Support — strict TDD"  "$assets_dir/support/strict-tdd.md"
-    _asset_row "Support — TDD verify"  "$assets_dir/support/strict-tdd-verify.md"
-    _asset_row "Support — SDD status"  "$assets_dir/support/sdd-status-contract.md"
-
+    # Delegation/memory/skills/SDD-workflow/TDD-support/skill-style-guide/review
+    # chains are NOT listed here: gentle-ai's own global install already provides
+    # a Claude-Code-adapted equivalent for each (~/.claude/CLAUDE.md's Agent Teams
+    # Lite section, ~/.claude/skills/_shared/, ~/.claude/skills/sdd-{apply,verify}/,
+    # ~/.claude/skills/skill-creator/references/, and the native review-* agents +
+    # judgment-day skill). Only vendor assets with no native Claude Code equivalent
+    # stay here.
     local docs_dir="$ADAPTER_ROOT/vendor/gentle-pi/docs"
     _asset_row "Doc — review integration"        "$docs_dir/review-integration.md"
-    _asset_row "Doc — skill style guide"         "$docs_dir/skill-style-guide.md"
 
     # Agent definitions — load the matching file before delegating to that agent
     local agent
