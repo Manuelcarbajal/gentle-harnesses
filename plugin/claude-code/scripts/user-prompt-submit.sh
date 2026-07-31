@@ -39,54 +39,33 @@ adapter_skill_rows() {
 # REMOVE this function if gentle-ai adds native asset path injection.
 # ---------------------------------------------------------------------------
 inject_asset_manifest() {
-    local assets_dir="$ADAPTER_ROOT/vendor/gentle-pi/assets"
-    [ -d "$assets_dir" ] || return 0
+    # Everything gentle-pi vendors except this one doc now has a native
+    # Claude-Code-adapted equivalent (gentle-ai's global install) or was never
+    # referenced by any Claude Code workflow to begin with — see HARNESS-AUDIT.md
+    # SS16. review-integration.md is the sole exception: the wire-protocol doc for
+    # gentle-ai's review CLI, agnostic, with no duplicate anywhere in this repo.
+    local review_doc="$ADAPTER_ROOT/vendor/gentle-pi/docs/review-integration.md"
+    [ -f "$review_doc" ] || return 0
 
-    local lines=""
-    _asset_row() {
-        local label="$1" path="$2"
-        [ -f "$path" ] && lines="${lines}\n- ${label}: \`${path}\`"
-    }
-
-    # Delegation/memory/skills/SDD-workflow/TDD-support/skill-style-guide/review
-    # chains are NOT listed here: gentle-ai's own global install already provides
-    # a Claude-Code-adapted equivalent for each (~/.claude/CLAUDE.md's Agent Teams
-    # Lite section, ~/.claude/skills/_shared/, ~/.claude/skills/sdd-{apply,verify}/,
-    # ~/.claude/skills/skill-creator/references/, and the native review-* agents +
-    # judgment-day skill). Only vendor assets with no native Claude Code equivalent
-    # stay here.
-    local docs_dir="$ADAPTER_ROOT/vendor/gentle-pi/docs"
-    _asset_row "Doc — review integration"        "$docs_dir/review-integration.md"
-
-    # Agent definitions — load the matching file before delegating to that agent
-    local agent
-    for agent in "$assets_dir"/agents/*.md; do
-        [ -f "$agent" ] || continue
-        local aname
-        aname="$(basename "$agent" .md)"
-        _asset_row "Agent — ${aname}" "$agent"
-    done
-
-    [ -z "$lines" ] && return 0
-    printf '## Adapter Assets\n\nLoad the file when the workflow applies — do not preload.\n%b\n' "$lines"
+    printf '## Adapter Assets\n\nLoad the file when the workflow applies — do not preload.\n- Doc — review integration: `%s`\n' "$review_doc"
 }
 
 inject_adapter_skills() {
     local registry="$1"
     local plugin_dir="$ADAPTER_ROOT/plugin/claude-code/skills"
-    local vendor_dir="$ADAPTER_ROOT/vendor/gentle-pi/skills"
 
-    local plugin_rows vendor_rows
+    # vendor/gentle-pi/skills/ is no longer checked out (see
+    # vendor-sparse-checkout.patterns) — its only two entries (gentle-ai,
+    # release) were always shadowed by these same-named plugin skills anyway,
+    # confirmed via HARNESS-AUDIT.md SS16's audit before dropping the merge.
+    local plugin_rows
     plugin_rows=$(adapter_skill_rows "$plugin_dir" "plugin" "$registry")
-    local augmented="${registry}${plugin_rows}"
-    vendor_rows=$(adapter_skill_rows "$vendor_dir" "adapter" "$augmented")
 
-    [ -z "$plugin_rows" ] && [ -z "$vendor_rows" ] && { printf '%s' "$registry"; return; }
+    [ -z "$plugin_rows" ] && { printf '%s' "$registry"; return; }
 
     local header
     header="$(printf '\n\n## Adapter Skills\n\n| Skill | Trigger / description | Scope | Path |\n| --- | --- | --- | --- |')"
-    # $() strips trailing newlines — add explicit \n between sections
-    printf '%s%s\n%s\n%s\n' "$registry" "$header" "$plugin_rows" "$vendor_rows"
+    printf '%s%s\n%s\n' "$registry" "$header" "$plugin_rows"
 }
 
 review_raw=$(gentle_ai_review_status "$CWD")

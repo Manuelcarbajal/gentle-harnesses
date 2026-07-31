@@ -17,8 +17,8 @@ load "helpers"
     assert_success
     # Unique to gentle-pi — no equivalent shipped by gentle-ai's global install
     assert_output --partial "Doc — review integration"
-    assert_output --partial "Agent — gentle-ai-explore"
     # Redundant with gentle-ai's global install — must not be injected
+    refute_output --partial "Agent —"
     refute_output --partial "Delegation rules"
     refute_output --partial "Memory protocol"
     refute_output --partial "Skills discovery"
