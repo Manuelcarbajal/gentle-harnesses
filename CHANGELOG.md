@@ -7,6 +7,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0-beta.9] - 2026-07-31
+
+### Fixed
+
+- **`vendor/gentle-pi`'s sparse-checkout was never actually persisted** — the scope lived only
+  under `.git/modules/vendor/gentle-pi/info/sparse-checkout` (local git plumbing, never
+  committed by `git add vendor/gentle-pi`), so `.github/workflows/{ci,release}.yml` and every
+  fresh clone always checked out the full, untrimmed submodule regardless of prior local
+  narrowing. Tracked the pattern list at `plugin/claude-code/scripts/vendor-sparse-checkout.patterns`
+  and added `sync-vendor-sparse-checkout.sh` to apply it, wired into both CI workflows and
+  documented in `DEVELOPMENT.md`.
+
+### Removed
+
+- **`inject_asset_manifest()` removed entirely from `user-prompt-submit.sh`.** Every remaining
+  `vendor/gentle-pi` content source turned out to be dead weight or actively counterproductive:
+  the 2 vendor skill dirs were always shadowed by same-named local plugin skills; the 4 agent
+  docs (`gentle-ai-explore/worker/verify`, `review-validator`) were referenced by nothing
+  anywhere in the repo, and 3 of the 4 are explicitly flagged as Claude-Code-inapplicable Pi
+  noise by `skills/gentle-ai/SKILL.md`'s own context filter; `docs/review-integration.md`
+  itself substantively duplicates the review-orchestration instructions `gentle-ai install`
+  already writes into `~/.claude/CLAUDE.md` (confirmed by direct comparison and by completing
+  two full native review cycles this session without reading it). `vendor/gentle-pi` now checks
+  out only root files (`LICENSE`, `README.md`, etc, kept for MIT compliance and provenance) —
+  zero functional content dependency remains.
+
+### Changed
+
+- **`vendor/gentle-pi` bumped to `5fe1beaa`** (v2.1.2 + 11 upstream commits; diffed first, no
+  structural changes to any tracked path).
+- **`HARNESS-AUDIT.md` refreshed and committed** for the first time — previously kept as
+  local-only working notes. Stale Phase 5 checkboxes corrected (were unchecked despite shipping
+  in beta.6), Phase 6 marked resolved (contracts dependency removed rather than migrated), and a
+  new SS16 living-changelog section added covering beta.5 through this release.
+
+---
+
 ## [0.2.0-beta.8] - 2026-07-31
 
 ### Fixed
