@@ -7,6 +7,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0-beta.8] - 2026-07-31
+
+### Fixed
+
+- **`user-prompt-submit.sh` crashed with a raw `jq: command not found` instead of degrading
+  gracefully** — every other `jq` call in this script (and the sibling `pre-tool-use.sh`) checks
+  `command -v jq` first; the final `hookSpecificOutput` build was the one path without a guard.
+  Now exits cleanly when `jq` is unavailable, matching the rest of the hook.
+
+### Changed
+
+- **`vendor/gentle-pi` updated to v2.1.2** (from v1.2.0-1, 13 upstream commits).
+- **`inject_asset_manifest()` no longer injects vendor content gentle-ai already provides
+  natively** — delegation rules, memory protocol, skills discovery, SDD workflow, review chains,
+  TDD support docs, and the skill style guide are all Pi-specific originals with a
+  Claude-Code-adapted equivalent already installed globally by `gentle-ai` (confirmed via direct
+  diff). Only `docs/review-integration.md` and the 4 `gentle-ai-*`/`review-validator` agent docs
+  remain, since those have no native gentle-ai equivalent.
+
+---
+
 ## [0.2.0-beta.7] - 2026-07-26
 
 ### Fixed
