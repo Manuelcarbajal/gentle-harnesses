@@ -16,6 +16,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply vendor sparse checkout
+        run: bash plugin/claude-code/scripts/sync-vendor-sparse-checkout.sh
+
       - name: Install bats dependencies
         run: bash plugin/claude-code/tests/install-deps.sh
 

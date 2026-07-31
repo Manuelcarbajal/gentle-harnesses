@@ -1,562 +1,648 @@
-# Harness Audit — Filosofía, Límites y Arquitectura de Largo Plazo
+# Harness Audit — Philosophy, Boundaries, and Long-Term Architecture
 
-Status: **Análisis completo — implementación pendiente** (fecha del análisis: 2026-07-26)
+Status: **Analysis complete, roadmap partially executed** (analysis date: 2026-07-26,
+last refreshed: 2026-07-31 — see §16 for what shipped since the original analysis)
 
-Revisión arquitectónica de `gentle-claude` y de todo lo vendorizado desde `gentle-pi`,
-contrastado contra el código fuente real de `gentle-ai` (módulo Go cacheado localmente en
-`gentleman-programming/gentle-ai@v1.49.0`, verificado además contra el binario instalado
-v2.1.11) — no contra supuestos sobre lo que "debería" tener.
+Architectural review of `gentle-claude` and everything vendored from `gentle-pi`, checked
+against the real `gentle-ai` source code (Go module cached locally at
+`gentleman-programming/gentle-ai@v1.49.0`, also verified against the installed binary
+v2.1.11) — not against assumptions about what it "should" have.
 
 ---
 
-## 0. Hallazgo central: Gentle-AI ya es multi-host — el problema no es "adaptar", es "no duplicar"
+## 0. Core finding: Gentle-AI is already multi-host — the problem isn't "adapting", it's "not duplicating"
 
-La pregunta que guio este análisis fue "¿qué le pertenece a quién?". La respuesta cambió a
-mitad de camino, al leer el código fuente real de `gentle-ai`:
+The question that guided this analysis was "who owns what?". The answer changed halfway
+through, after reading the real `gentle-ai` source code:
 
-**Gentle-AI ya tiene una abstracción de adaptador nativa para 16 hosts** —
-`internal/agents/interface.go` define un `Adapter` con métodos como `SkillsDir`,
-`SubAgentsDir`, `SettingsPath`, `MCPStrategy`, y `internal/agents/factory.go` conecta
-implementaciones concretas para Claude Code, Cursor, Codex, Windsurf, Pi, OpenCode, Gemini
-CLI, VS Code Copilot, Kilocode, Kimi, Qwen Code, Kiro, Antigravity, OpenClaw, Trae y Hermes.
+**Gentle-AI already has a native adapter abstraction for 16 hosts** —
+`internal/agents/interface.go` defines an `Adapter` with methods like `SkillsDir`,
+`SubAgentsDir`, `SettingsPath`, `MCPStrategy`, and `internal/agents/factory.go` wires
+concrete implementations for Claude Code, Cursor, Codex, Windsurf, Pi, OpenCode, Gemini
+CLI, VS Code Copilot, Kilocode, Kimi, Qwen Code, Kiro, Antigravity, OpenClaw, Trae, and Hermes.
 
-Más aún: **gentle-ai ya empaqueta e instala nativamente casi todos los mismos skills y
-agents que `vendor/gentle-pi/` vuelve a traer por sparse submodule.**
-`internal/assets/skills/` contiene `branch-pr`, `chained-pr`, `cognitive-doc-design`,
+Even more: **gentle-ai already packages and natively installs almost all of the same
+skills and agents that `vendor/gentle-pi/` re-brings via sparse submodule.**
+`internal/assets/skills/` contains `branch-pr`, `chained-pr`, `cognitive-doc-design`,
 `comment-writer`, `issue-creation`, `judgment-day`, `skill-creator`, `skill-improver`,
-`skill-registry`, `work-unit-commits` y las 7 skills de SDD. `internal/assets/claude/agents/`
-ya trae, con el formato correcto de subagente de Claude Code (herramientas en mayúscula, no
-el vocabulario Pi en minúscula), los cuatro lentes de review, los tres roles de Judgment Day
-y los doce agentes de SDD — instalados de forma nativa en `~/.claude/agents/` vía
-`gentle-ai install`/`sync`.
+`skill-registry`, `work-unit-commits`, and the 7 SDD skills. `internal/assets/claude/agents/`
+already ships, in the correct Claude Code subagent format (capitalized tool names, not
+Pi's lowercase vocabulary), the four review lenses, the three Judgment Day roles, and the
+twelve SDD agents — natively installed into `~/.claude/agents/` via `gentle-ai install`/`sync`.
 
-Esto reformula el problema. No se trata de decidir "qué vendorizar de gentle-pi", sino de
-reconocer que **gran parte de `vendor/gentle-pi/assets/agents/` y varios skills vendorizados
-son, con altísima probabilidad, una segunda copia — con formato roto (frontmatter en el
-dialecto de herramientas de Pi, no el de Claude Code) — de algo que `gentle-ai install` ya
-coloca correctamente en `~/.claude/`.** El harness no necesita reinventar ni revendorizar esa
-capa; necesita apoyarse en ella y limitarse a lo que ningún `install` en frío puede darle: el
-cableado de hooks en vivo dentro de una sesión de Claude Code.
+This reframes the problem. It isn't about deciding "what to vendor from gentle-pi", but
+recognizing that **a large part of `vendor/gentle-pi/assets/agents/` and several vendored
+skills are, with very high probability, a second copy — with broken format (frontmatter in
+Pi's tool dialect, not Claude Code's) — of something `gentle-ai install` already places
+correctly in `~/.claude/`.** The harness doesn't need to reinvent or re-vendor that layer;
+it needs to rely on it and limit itself to what no cold `install` can give it: live hook
+wiring inside a running Claude Code session.
 
-Un segundo hallazgo de igual peso: **ya existe una duplicación literal, no conceptual.**
-`internal/components/sdd/inject.go:1454-1504` instala en `~/.claude/settings.json` un hook
-`UserPromptSubmit` que ejecuta textualmente
+A second finding of equal weight: **there is already literal, not conceptual,
+duplication.** `internal/components/sdd/inject.go:1454-1504` installs a `UserPromptSubmit`
+hook into `~/.claude/settings.json` that runs, verbatim,
 `gentle-ai skill-registry refresh --quiet --no-gitignore --cwd "${CLAUDE_PROJECT_DIR:-$PWD}" || true`
-— el mismo comando, carácter por carácter, que `plugin/claude-code/hooks/hooks.json:26-34` ya
-declara como primer hook `UserPromptSubmit` del plugin. Un usuario que corrió
-`gentle-ai install` para Claude Code *y* instaló el plugin gentle-claude dispara ese comando
-dos veces por cada prompt.
+— the exact same command, character for character, that
+`plugin/claude-code/hooks/hooks.json:26-34` already declares as the plugin's first
+`UserPromptSubmit` hook. A user who ran `gentle-ai install` for Claude Code *and* installed
+the gentle-claude plugin triggers that command twice per prompt.
 
 ---
 
-## 1. Filosofía oficial del proyecto
+## 1. Official project philosophy
 
-**Gentle Harnesses conecta el ecosistema Gentle-AI con hosts que tienen un ciclo de vida de
-sesión propio, en vivo, que Gentle-AI no puede alcanzar instalando archivos en frío.** Su
-única razón de existir es esa brecha: hooks que se disparan durante una sesión real (arranque,
-cada prompt, cada llamada a herramienta, fin de subagente, cierre), traduciendo el contrato
-específico del host hacia llamadas contra la CLI estable de `gentle-ai`.
+**Gentle Harnesses connects the Gentle-AI ecosystem to hosts that have their own live
+session lifecycle — one Gentle-AI cannot reach by installing files cold.** Its only reason
+to exist is that gap: hooks that fire during a real session (startup, every prompt, every
+tool call, subagent end, shutdown), translating the specific host contract into calls
+against `gentle-ai`'s stable CLI.
 
-### Qué SÍ es la misión
+### What the mission IS
 
-- Traducir el contrato de hooks de un host concreto (formato de payload, variables de
-  entorno, forma de bloquear/permitir una acción) hacia comandos de `gentle-ai`.
-- Reaccionar a eventos que sólo ocurren en tiempo real dentro de la sesión (una llamada a
-  `Bash`, un `git commit`, un subagente que termina) — nada de esto existe todavía en el
-  momento de `gentle-ai install`.
-- Rellenar, de forma explícitamente temporal y documentada, huecos que la CLI nativa aún no
-  cubre (el ejemplo correcto ya existe en el propio repo: `inject_adapter_skills()` trae un
-  comentario `REMOVE this function if gentle-ai adds native support for these paths`).
+- Translate a specific host's hook contract (payload format, environment variables, how
+  to block/allow an action) into `gentle-ai` commands.
+- React to events that only happen in real time inside the session (a `Bash` call, a
+  `git commit`, a subagent finishing) — none of this exists yet at the time of
+  `gentle-ai install`.
+- Fill, in an explicitly temporary and documented way, gaps the native CLI doesn't yet
+  cover (the correct example already exists in this very repo: `inject_adapter_skills()`
+  carries a `REMOVE this function if gentle-ai adds native support for these paths`
+  comment).
 
-### Qué NO es la misión
+### What the mission is NOT
 
-- No es reimplementar el motor de review, la clasificación de riesgo, el registro de skills o
-  el modelo de agentes — eso ya existe en `gentle-ai` y, para varios casos, ya existe también
-  empaquetado nativamente para Claude Code específicamente.
-- No es mantener una segunda copia de contenido agnóstico de plataforma (skills, agentes,
-  contratos) sólo porque gentle-pi lo trae — si gentle-ai ya lo instala nativamente,
-  revendorizarlo es peso muerto con riesgo de desincronización.
-- No es convertirse en el lugar donde vive la identidad de memoria, SDD o revisión del
-  ecosistema — esas siguen siendo responsabilidad de gentle-ai / engram, tal como el propio
-  `MIGRATION-RESEARCH.md` ya establece correctamente ("gentle-claude should not try to own
+- It is not reimplementing the review engine, risk classification, the skill registry, or
+  the agent model — that already exists in `gentle-ai` and, for several cases, is also
+  already packaged natively for Claude Code specifically.
+- It is not maintaining a second copy of platform-agnostic content (skills, agents,
+  contracts) just because gentle-pi brings it — if gentle-ai already installs it natively,
+  re-vendoring it is dead weight with a desync risk.
+- It is not becoming the place where memory, SDD, or review identity for the ecosystem
+  lives — those remain the responsibility of gentle-ai / engram, exactly as
+  `MIGRATION-RESEARCH.md` already correctly states ("gentle-claude should not try to own
   memory either").
 
 ---
 
-## 2. Principios arquitectónicos
+## 2. Architectural principles
 
-1. **Fuente única de la verdad para toda política de ecosistema.** Umbrales de riesgo,
-   taxonomía de comandos peligrosos, formato de skill registry: viven una sola vez, en
-   `gentle-ai`. Si un harness necesita esa lógica, la invoca — no la reescribe en bash,
-   TypeScript o donde sea.
-2. **Antes de vendorizar, verificar si ya es nativo.** Todo contenido "agnóstico de
-   plataforma" candidato a `vendor/` debe primero chequearse contra `internal/assets/` de
-   gentle-ai. Si ya está ahí con el formato correcto para el host, no se vendoriza — se
-   documenta como dependencia de `gentle-ai install`.
-3. **Todo lo que se vendorice temporalmente debe estar etiquetado como removible**, con la
-   condición exacta de remoción (ej. "remover cuando gentle-ai exponga X"). El patrón ya
-   existe en este repo (`inject_adapter_skills()`); debe generalizarse, no ser la excepción.
-4. **El harness traduce protocolos, no inventa política de seguridad.** Cuando por diseño la
-   política debe vivir en el host (ej. el guard de comandos destructivos, que el propio
-   `gentle-ai` declara intencionalmente fuera de su alcance), su contenido debe tener una
-   única fuente versionada compartida entre hosts — no una copia manual por adaptador que
-   puede divergir silenciosamente.
-5. **Ningún hook debe fallar en silencio contra un comando inexistente.** Un `|| true` que
-   traga un `unknown command` no es "fail-open", es un bug invisible sin cobertura de test.
-6. **Un test por script de hook, sin excepción.** El propio `AGENTS.md` del harness ya lo
-   exige; hay que cumplirlo, no solo declararlo.
+1. **Single source of truth for all ecosystem policy.** Risk thresholds, the dangerous
+   command taxonomy, skill registry format: they live in exactly one place, `gentle-ai`.
+   If a harness needs that logic, it invokes it — it doesn't rewrite it in bash,
+   TypeScript, or anywhere else.
+2. **Before vendoring, check if it's already native.** Any "platform-agnostic" content
+   that's a candidate for `vendor/` must first be checked against gentle-ai's
+   `internal/assets/`. If it's already there in the correct format for the host, it isn't
+   vendored — it's documented as a `gentle-ai install` dependency.
+3. **Everything vendored temporarily must be labeled as removable**, with the exact
+   removal condition (e.g. "remove when gentle-ai exposes X"). The pattern already exists
+   in this repo (`inject_adapter_skills()`); it should be generalized, not treated as the
+   exception.
+4. **The harness translates protocols, it doesn't invent security policy.** When, by
+   design, policy must live in the host (e.g. the destructive-command guard, which
+   `gentle-ai` itself intentionally declares out of its own scope), its content must have
+   a single versioned source shared across hosts — not a manual per-adapter copy that can
+   silently diverge.
+5. **No hook should fail silently against a nonexistent command.** A `|| true` that
+   swallows an `unknown command` isn't "fail-open", it's an invisible bug with zero test
+   coverage.
+6. **One test per hook script, no exceptions.** The harness's own `AGENTS.md` already
+   requires this; it needs to be enforced, not just stated.
 
 ---
 
-## 3. Responsabilidades de Gentle-AI (verificadas en código, no asumidas)
+## 3. Gentle-AI's responsibilities (verified in code, not assumed)
 
-| Capacidad | Evidencia | Estado real |
+| Capability | Evidence | Real status |
 |---|---|---|
-| Abstracción de adaptador multi-host (16 hosts) | `internal/agents/interface.go`, `factory.go:25-52` | Nativo y completo |
-| Instalación / sync de config, skills y agents por host | `internal/cli/install.go`, `sync.go`, `internal/components/skills/inject.go` | Nativo y completo |
-| Formato de skill registry (`.atl/skill-registry.md`) | `internal/skillregistry/registry.go:19-105` | Nativo, formato cerrado (ver §5) |
-| Motor de review (start/finalize/validate/status), contrato v1 | `gentle-ai review --help`, `internal/reviewtransaction/` | Nativo — la CLI instalada (v2.1.11) expone la superficie unificada; el clasificador de riesgo (`ClassifyRisk`) existe como librería pero no está enganchado a ningún comando en la fuente auditada (v1.49.0) |
-| Agentes de review (4R), Judgment Day, SDD — contenido y despliegue | `internal/assets/claude/agents/*.md`, instalados vía `SubAgentsDir` | Nativo, formato correcto de subagente de Claude Code |
-| Skills agnósticos (branch-pr, chained-pr, comment-writer, etc.) | `internal/assets/skills/*` | Nativo |
-| Comandos slash de SDD para Claude Code | `internal/assets/claude/commands/*.md` | Nativo — coincide con los `sdd-*` ya activos como skills instalados |
-| `doctor` (salud del ecosistema) | `internal/cli/doctor.go:41,70-84` | Nativo — 4 chequeos (binarios conocidos, `state.json`, engram HTTP, disco). `codegraph` no estaba en la lista de binarios conocidos en v1.49.0; a reconfirmar contra v2.1.11 |
-| Skill "release" (publicación npm de gentle-pi) | ausente en `internal/assets/skills/` | **No existe de forma nativa** — es genuinamente específico de Pi |
-| Hooks de ciclo de vida en tiempo de sesión (SessionStart, PreToolUse, SubagentStop, Stop de Claude Code) | grep sin resultados en `internal/` más allá de la inyección puntual de `UserPromptSubmit` | **No existe** — es exactamente el vacío que el harness debe llenar |
+| Multi-host adapter abstraction (16 hosts) | `internal/agents/interface.go`, `factory.go:25-52` | Native and complete |
+| Config/skills/agents install-sync per host | `internal/cli/install.go`, `sync.go`, `internal/components/skills/inject.go` | Native and complete |
+| Skill registry format (`.atl/skill-registry.md`) | `internal/skillregistry/registry.go:19-105` | Native, closed format (see §5) |
+| Review engine (start/finalize/validate/status), v1 contract | `gentle-ai review --help`, `internal/reviewtransaction/` | Native — the installed CLI (v2.1.11) exposes the unified surface; the risk classifier (`ClassifyRisk`) exists as a library but isn't wired into any command in the audited source (v1.49.0) |
+| Review agents (4R), Judgment Day, SDD — content and deployment | `internal/assets/claude/agents/*.md`, installed via `SubAgentsDir` | Native, correct Claude Code subagent format |
+| Agnostic skills (branch-pr, chained-pr, comment-writer, etc.) | `internal/assets/skills/*` | Native |
+| SDD slash commands for Claude Code | `internal/assets/claude/commands/*.md` | Native — matches the `sdd-*` skills already installed |
+| `doctor` (ecosystem health) | `internal/cli/doctor.go:41,70-84` | Native — 4 checks (known binaries, `state.json`, engram HTTP, disk). `codegraph` wasn't in the known-binaries list in v1.49.0; needs reconfirming against v2.1.11 |
+| "release" skill (gentle-pi npm publishing) | absent from `internal/assets/skills/` | **Does not exist natively** — genuinely Pi-specific |
+| Session-lifecycle hooks (Claude Code's SessionStart, PreToolUse, SubagentStop, Stop) | grep returns nothing in `internal/` beyond the single-point `UserPromptSubmit` injection | **Does not exist** — exactly the gap the harness must fill |
 
 ---
 
-## 4. Responsabilidades de Gentle Harnesses (y sólo éstas)
+## 4. Gentle Harnesses' responsibilities (and only these)
 
-- **Cableado de hooks en vivo**: `hooks.json` + los scripts bash que Claude Code ejecuta en
-  cada evento de sesión.
-- **Traducción de payloads del host**: parsear `CLAUDE_TOOL_NAME`, `CLAUDE_TOOL_INPUT`,
-  `CLAUDE_PLUGIN_ROOT`, el JSON de `SessionStart`/`PreToolUse`, y devolver las formas de
-  salida que Claude Code espera (`systemMessage`, `hookSpecificOutput`, `decision:block`).
-- **Resolución local del binario** (`$CLAUDE_PLUGIN_ROOT/bin/gentle-ai` antes que `PATH`).
-- **Prompts operacionales adaptados** a la forma real del repo que los usa (gpr/gcl/gis/gwr
-  sin las rutas de monorepo de Pi) — contenido genuinamente distinto por host, no candidato a
-  compartirse.
-- **Empaquetado e instalación de un solo comando** vía `.claude-plugin/marketplace.json` —
-  mecánica de distribución específica de Claude Code.
-- **Relleno temporal y etiquetado** de vacíos puntuales de la CLI (mientras existan).
+- **Live hook wiring**: `hooks.json` + the bash scripts Claude Code runs on every session
+  event.
+- **Host payload translation**: parsing `CLAUDE_TOOL_NAME`, `CLAUDE_TOOL_INPUT`,
+  `CLAUDE_PLUGIN_ROOT`, the `SessionStart`/`PreToolUse` JSON, and returning the output
+  shapes Claude Code expects (`systemMessage`, `hookSpecificOutput`, `decision:block`).
+- **Local binary resolution** (`$CLAUDE_PLUGIN_ROOT/bin/gentle-ai` before `PATH`).
+- **Operational prompts adapted** to this repo's actual shape (gpr/gcl/gis/gwr without
+  Pi's monorepo paths) — genuinely per-host content, not a sharing candidate.
+- **Single-command packaging and install** via `.claude-plugin/marketplace.json` —
+  Claude Code-specific distribution mechanics.
+- **Temporary, labeled filling** of point gaps in the CLI (while they exist).
 
-Todo lo demás — política de riesgo, taxonomía de comandos peligrosos como fuente única,
-contenido de skills/agentes agnósticos de plataforma, contratos de review — no le pertenece
-al harness ni siquiera temporalmente salvo que esté documentado como préstamo con fecha de
-vencimiento.
+Everything else — risk policy, the dangerous-command taxonomy as a single source,
+platform-agnostic skill/agent content, review contracts — doesn't belong to the harness,
+not even temporarily, unless it's documented as a loan with an expiration date.
 
 ---
 
-## 5. Análisis carpeta por carpeta — código nativo de gentle-claude
+## 5. Folder-by-folder analysis — native gentle-claude code
 
 ### `plugin/claude-code/hooks/hooks.json`
-**MANTENER.** Responsabilidad bien definida: cablea 6 registros de hook contra 5 eventos de
-Claude Code. El único punto flojo es que el `UserPromptSubmit` de skill-registry duplica
-literalmente lo que `gentle-ai install` ya puede escribir en `~/.claude/settings.json` (ver
-§0) — decisión a tomar en el roadmap, no un problema de diseño del archivo en sí.
+**KEEP.** Well-defined responsibility: wires 6 hook registrations against 5 Claude Code
+events. The only weak spot is that the skill-registry `UserPromptSubmit` literally
+duplicates what `gentle-ai install` can already write into `~/.claude/settings.json` (see
+§0) — a roadmap decision, not a design problem with the file itself.
 
 ### `plugin/claude-code/scripts/gentle_ai.sh`
-**MANTENER.** El archivo mejor escrito del repo: wrappers finos de invocación de proceso,
-verificados en vivo contra la forma real de salida de la CLI instalada. Cero lógica de
-política propia.
+**KEEP.** The best-written file in the repo: thin process-invocation wrappers, verified
+live against the installed CLI's real output shape. Zero policy logic of its own.
 
 ### `plugin/claude-code/scripts/session-start.sh`
-**ADAPTAR.** Correcto en su mayoría. Un chequeo redundante: verifica `command -v codegraph`
-por separado de `gentle_ai_doctor` — redundante sólo si `doctor` ya cubre `codegraph` en la
-versión instalada (no confirmado).
+**ADAPT.** Mostly correct. One redundant check: it verifies `command -v codegraph`
+separately from `gentle_ai_doctor` — redundant only if `doctor` already covers
+`codegraph` in the installed version (unconfirmed).
 
 ### `plugin/claude-code/scripts/user-prompt-submit.sh`
-**ADAPTAR.** `inject_adapter_skills()` e `inject_asset_manifest()` son el patrón correcto de
-duplicación temporal: están explícitamente marcadas para removerse. El único hueco real es
-que sólo el estado `next_transition.kind == "review.start"` se advierte como bloqueante; el
-estado `"collect"` (lineage ambigua) cae al mensaje genérico.
+**ADAPT.** `inject_adapter_skills()` and `inject_asset_manifest()` are the correct pattern
+for temporary duplication: they're explicitly marked for removal. The one real gap is that
+only the `next_transition.kind == "review.start"` state is surfaced as blocking; the
+`"collect"` state (ambiguous lineage) falls through to the generic message.
 
 ### `plugin/claude-code/scripts/pre-tool-use.sh`
-**Hallazgo principal de todo el audit.** `classify_diff()` (líneas 26-51) reimplementa desde
-cero un clasificador LOW/MED/HIGH — el mismo trabajo que, según su propio texto de ayuda, hace
-`gentle-ai review start` ("derive the bounded review tier, lenses, and correction budget").
-Pero **ningún hook de este repo llama nunca a `review start`** — sólo se invoca
-`review validate --gate pre-commit/pre-push`, que valida un recibo ya existente, no lo crea.
-Esto significa que la copia en bash no es un atajo local confirmado después por la CLI: es,
-hoy, el único árbitro automático de si la puerta de revisión aplica siquiera.
-`classify_command()` (líneas 56-98) reimplementa además, en bash, la misma taxonomía
-hard-deny/confirm/allow que gentle-pi mantiene por separado en TypeScript
-(`classifyGuardedCommand()`) — sin una fuente compartida versionada entre ambas copias.
+**Main finding of the entire audit.** `classify_diff()` (lines 26-51) reimplements a
+LOW/MED/HIGH classifier from scratch — the same work that, per its own help text,
+`gentle-ai review start` does ("derive the bounded review tier, lenses, and correction
+budget"). But **no hook in this repo ever calls `review start`** — only
+`review validate --gate pre-commit/pre-push` is invoked, which validates an existing
+receipt, not creates one. This means the bash copy isn't a local shortcut later confirmed
+by the CLI: today, it's the sole automatic arbiter of whether the review gate even
+applies. `classify_command()` (lines 56-98) additionally reimplements, in bash, the same
+hard-deny/confirm/allow taxonomy that gentle-pi separately maintains in TypeScript
+(`classifyGuardedCommand()`) — with no shared versioned source between the two copies.
 
 ### `plugin/claude-code/scripts/post-compaction.sh`
-**MANTENER.** Correctamente acotado a traducción de payload; el bug histórico (comparaba
-contra un campo `trigger` inexistente) ya está corregido y cubierto por test.
+**KEEP.** Correctly scoped to payload translation; the historical bug (compared against a
+nonexistent `trigger` field) is already fixed and covered by a test.
 
 ### `plugin/claude-code/scripts/subagent-stop.sh`
-**Roto en producción.** Ejecuta `"$bin" mem capture --passive --quiet` — `gentle-ai mem` no
-existe como subcomando (confirmado en vivo: `Error: unknown command "mem"`). El
-`2>/dev/null || true` se traga el error, así que el hook es un no-op silencioso en cada
-ejecución, contradiciendo la propia decisión de "delegar memoria a Engram MCP" que el resto
-del repo respeta. Sin cobertura de test (no existe `test_subagent_stop.bats`), pese a que
-`AGENTS.md` exige un test por script.
+**Broken in production.** Runs `"$bin" mem capture --passive --quiet` — `gentle-ai mem`
+doesn't exist as a subcommand (confirmed live: `Error: unknown command "mem"`). The
+`2>/dev/null || true` swallows the error, so the hook is a silent no-op on every run,
+contradicting this repo's own decision to "delegate memory to Engram MCP" that the rest
+of the codebase respects. No test coverage (`test_subagent_stop.bats` doesn't exist),
+despite `AGENTS.md` requiring one test per script.
 
 ### `plugin/claude-code/scripts/session-stop.sh`
-**A VERIFICAR.** El `systemMessage` de advertencia se emite dentro de un subshell en
-background (`&`) después de que el hook ya devolvió `exit 0` — es probable que ese mensaje
-nunca llegue a mostrarse, porque Claude Code lee la salida del hook en el momento en que el
-proceso termina, no de un job detrás en segundo plano. El test actual sólo verifica el código
-de salida, no si el mensaje se entrega.
+**TO VERIFY.** The warning `systemMessage` is emitted inside a background subshell (`&`)
+after the hook has already returned `exit 0` — it's likely that message never actually
+displays, because Claude Code reads the hook's output at the moment the process exits, not
+from a background job. The current test only checks the exit code, not whether the message
+is delivered.
 
 ### `plugin/claude-code/skills/gentle-ai/SKILL.md`
-**MANTENER.** Identidad correcta del harness; la sección de memoria delega bien a Engram MCP.
-El bloque de riesgo repite en prosa los mismos umbrales de `classify_diff()` — quinta
-restatación de la misma política en todo el ecosistema (bash, esta skill, README, la skill Pi
-vendorizada, y el `lib/review-risk.ts` original).
+**KEEP.** Correct harness identity; the memory section correctly delegates to Engram MCP.
+The risk block restates the same `classify_diff()` thresholds in prose — the fifth
+restatement of the same policy across the whole ecosystem (bash, this skill, README, the
+vendored Pi skill, and the original `lib/review-risk.ts`).
 
 ### `plugin/claude-code/prompts/*.md` (gpr, gcl, gis, gwr)
-**MANTENER.** Adaptación legítima: quitan las rutas de monorepo de Pi, mantienen la
-estructura. Único hueco: carecen del frontmatter YAML que sus originales vendorizados sí
-tienen, y no hay confirmación en el repo de que Claude Code los registre como comandos `/gpr`
-reales — a verificar antes de asumir que están "vivos".
+**KEEP.** Legitimate adaptation: they drop Pi's monorepo paths, keep the structure. The
+one gap: they lack the YAML frontmatter their vendored originals have, and there's no
+confirmation in the repo that Claude Code registers them as real `/gpr` commands — worth
+verifying before assuming they're "live".
 
 ### `.claude-plugin/plugin.json` + `marketplace.json`
-**MANTENER.** Metadata correcta, versión sincronizada con `CHANGELOG.md`.
+**KEEP.** Correct metadata, version synced with `CHANGELOG.md`.
 
 ### `plugin/claude-code/tests/`
-**ADAPTAR.** 47 tests reales, cobertura sólida de `classify_command`/`classify_diff`. Gap
-concreto: cero cobertura de `subagent-stop.sh` (exactamente el script roto).
-`helpers.bash` arrastra una ruta hardcodeada de la máquina del desarrollador y andamiaje de
-la era Python que ya no se usa.
+**ADAPT.** 47 real tests, solid coverage of `classify_command`/`classify_diff`. Concrete
+gap: zero coverage of `subagent-stop.sh` (exactly the broken script). `helpers.bash`
+carries a hardcoded path from the developer's machine and Python-era scaffolding that's no
+longer used.
 
-### Docs raíz (`README`, `CONTRIBUTING`, `DEVELOPMENT`, `CHANGELOG`, `docs/flow.md`)
-**MANTENER.** Consistentes entre sí y con el comportamiento real. Un desvío menor:
-`CONTRIBUTING.md` menciona un helper `log_info` que no existe en ningún script.
+### Root docs (`README`, `CONTRIBUTING`, `DEVELOPMENT`, `CHANGELOG`, `docs/flow.md`)
+**KEEP.** Consistent with each other and with actual behavior. One minor drift:
+`CONTRIBUTING.md` mentions a `log_info` helper that doesn't exist in any script.
 
 ### `md/MIGRATION.MD` (gitignored)
-**ELIMINAR.** Predata la reescritura bash→Python en horas, diagnostica defectos de archivos
-`.py` que ya no existen, y su plan de remediación incremental quedó obsoleto por la
-reescritura completa que realmente ocurrió. Es tierra de nadie: invisible en git, pero un
-mapa erróneo para quien lo encuentre en disco.
+**DELETE.** Predates the bash→Python rewrite by hours, diagnoses defects in `.py` files
+that no longer exist, and its incremental remediation plan was made obsolete by the full
+rewrite that actually happened. It's no-man's-land: invisible in git, but a wrong map for
+anyone who finds it on disk.
 
 ### `.github/workflows/ci.yml`, `release.yml`
-**MANTENER.** Automatización mínima y correcta, sin política de ecosistema embebida.
+**KEEP.** Minimal, correct automation, no embedded ecosystem policy.
 
 ---
 
-## 6. Análisis completo de `vendor/gentle-pi/`
+## 6. Full analysis of `vendor/gentle-pi/`
 
-Sparse submodule que materializa sólo `skills/`, `prompts/`, `contracts/`, `assets/`,
-`docs/`. Cada fila fue leída completa y contrastada contra `internal/assets/` de gentle-ai.
+Sparse submodule that materializes only `skills/`, `prompts/`, `contracts/`, `assets/`,
+`docs/`. Every row was read in full and checked against gentle-ai's `internal/assets/`.
 
-### `skills/` — 12 carpetas + `_shared`
+### `skills/` — 12 folders + `_shared`
 
-| Skill | ¿Ya nativo en gentle-ai? | Veredicto |
+| Skill | Already native in gentle-ai? | Verdict |
 |---|---|---|
-| `branch-pr`, `chained-pr`, `cognitive-doc-design`, `comment-writer`, `issue-creation`, `judgment-day`, `skill-creator`, `skill-improver`, `skill-registry`, `work-unit-commits` | Sí — confirmado byte a byte en `internal/assets/skills/` | Redundante con lo nativo |
-| `gentle-ai/SKILL.md` (versión Pi) | No aplica — es identidad de Pi | Correctamente suprimida por la skill local |
-| `release/SKILL.md` | **No** — confirmado ausente en `internal/assets/skills/` | Riesgo de mal uso (ver hallazgo abajo) |
-| `_shared/review-ledger-contract.md` | Existe una copia mejor mantenida en `internal/assets/skills/_shared/` | Huérfano, inalcanzable por el patrón de inyección actual |
+| `branch-pr`, `chained-pr`, `cognitive-doc-design`, `comment-writer`, `issue-creation`, `judgment-day`, `skill-creator`, `skill-improver`, `skill-registry`, `work-unit-commits` | Yes — confirmed byte-for-byte in `internal/assets/skills/` | Redundant with native |
+| `gentle-ai/SKILL.md` (Pi version) | N/A — it's Pi's identity | Correctly suppressed by the local skill |
+| `release/SKILL.md` | **No** — confirmed absent from `internal/assets/skills/` | Misuse risk (see finding below) |
+| `_shared/review-ledger-contract.md` | A better-maintained copy exists in `internal/assets/skills/_shared/` | Orphaned, unreachable by the current injection pattern |
 
-**El skill `release` vendorizado es el runbook de publicación npm de gentle-pi**
+**The vendored `release` skill is gentle-pi's npm publishing runbook**
 (`pnpm publish --dry-run`, `gh workflow run publish.yml --repo Gentleman-Programming/gentle-pi`),
-y como no hay override local con ese nombre, se inyecta tal cual en cualquier proyecto que use
-gentle-claude — incluido el propio gentle-claude, cuyo release real es tag → GitHub Release sin
-npm. Es el hallazgo de mayor severidad de todo el análisis de vendor/: instrucciones activamente
-equivocadas, no sólo peso muerto.
+and since there's no local override with that name, it gets injected as-is into any
+project using gentle-claude — including gentle-claude itself, whose actual release is
+tag → GitHub Release, no npm. This is the highest-severity finding in the entire
+vendor/ analysis: actively wrong instructions, not just dead weight.
 
 ### `prompts/`
-**MANTENER como referencia**, no inyectados (decisión correcta, documentada en `NOTICE`).
-Cuatro de cinco ya tienen copia adaptada local; `skill-creation.md` es el único que quedó sin
-adaptar — hueco menor, baja prioridad.
+**KEEP as reference**, not injected (correct decision, documented in `NOTICE`). Four of
+five already have a local adapted copy; `skill-creation.md` is the only one left
+unadapted — minor gap, low priority.
 
-### `contracts/review-integration/v1/` — 18 archivos (8 schemas + 10 fixtures)
-**A MOVER.** Es, literalmente, el protocolo de red del propio binario `gentle-ai`
-(`$id: https://gentle-ai.dev/contracts/...`) — no le pertenece a gentle-pi ni a gentle-claude.
-Hoy nada en este repo lo parsea ni lo valida; sólo se usa el identificador de string
-`gentle-ai.review-integration/v1` pasado a la CLI. Candidato natural a vivir directamente en el
-repo de `gentle-ai` (o consumirse desde ahí), no a llegar de rebote vía gentle-pi.
+### `contracts/review-integration/v1/` — 18 files (8 schemas + 10 fixtures)
+**TO MOVE.** This is, literally, the `gentle-ai` binary's own wire protocol
+(`$id: https://gentle-ai.dev/contracts/...`) — it doesn't belong to gentle-pi or
+gentle-claude. Today nothing in this repo parses or validates it; only the string
+identifier `gentle-ai.review-integration/v1` is passed to the CLI. Natural candidate to
+live directly in the `gentle-ai` repo (or be consumed from there), not to arrive
+secondhand via gentle-pi.
 
 ### `assets/orchestrator*.md`, `chains/`, `support/`, `agents/`
-**MIXTO.** `orchestrator.md` está correctamente excluido de la inyección (placeholders
-`{{GENTLE_PI_*}}` sin resolver, identidad de Pi). `orchestrator-delegation.md` y
-`sdd-orchestrator-workflow.md` mezclan contenido genuinamente reutilizable (tabla de umbrales
-de delegación, modelo de fases SDD) con nombres exclusivos de Pi no cubiertos por el filtro de
-contexto actual en `SKILL.md` (`gentle-ai-explore/worker/verify`, `ask_user_question`,
-`/gentle:sdd-preflight`). `support/strict-tdd*.md` y `sdd-status-contract.md` son agnósticos y
-de alto valor. Los 26 archivos de `assets/agents/` tienen frontmatter en el vocabulario de
-herramientas de Pi (minúsculas, `find`/`webfetch`/`mem_*`) que Claude Code no interpreta —
-**22 de esos 26 ya existen, con el formato correcto, en `internal/assets/claude/agents/` de
-gentle-ai**; sólo `gentle-ai-explore/worker/verify` y `review-validator.md` no tienen
-equivalente nativo confirmado.
+**MIXED.** `orchestrator.md` is correctly excluded from injection (unresolved
+`{{GENTLE_PI_*}}` placeholders, Pi identity). `orchestrator-delegation.md` and
+`sdd-orchestrator-workflow.md` mix genuinely reusable content (delegation threshold
+table, SDD phase model) with Pi-exclusive names not covered by the current context filter
+in `SKILL.md` (`gentle-ai-explore/worker/verify`, `ask_user_question`,
+`/gentle:sdd-preflight`). `support/strict-tdd*.md` and `sdd-status-contract.md` are
+agnostic and high-value. The 26 files in `assets/agents/` have frontmatter in Pi's tool
+vocabulary (lowercase, `find`/`webfetch`/`mem_*`) that Claude Code doesn't interpret —
+**22 of those 26 already exist, in the correct format, in gentle-ai's
+`internal/assets/claude/agents/`**; only `gentle-ai-explore/worker/verify` and
+`review-validator.md` have no confirmed native equivalent.
 
 ### `assets/migrations/*.json`, `assets/gentle-logo-only.png`
-**ELIMINAR.** Manifiestos de checksum del instalador npm de gentle-pi y el logo de badge —
-cero referencias en todo el repo, efecto secundario inevitable del sparse checkout a nivel de
-directorio.
+**DELETE.** gentle-pi's npm installer checksum manifests and the badge logo — zero
+references anywhere in the repo, an inevitable side effect of directory-level sparse
+checkout.
 
 ### `docs/`
-`review-integration.md` y `skill-style-guide.md`: **mantener**, agnósticos y activamente
-cargados. `native-authority-architecture.md`: **retirar del manifiesto lazy** — es un reporte
-de ingeniería interna de la reescritura TypeScript de gentle-pi, cero contenido accionable
-para una sesión de Claude Code.
+`review-integration.md` and `skill-style-guide.md`: **keep**, agnostic and actively
+loaded. `native-authority-architecture.md`: **remove from the lazy manifest** — it's an
+internal engineering report on gentle-pi's TypeScript rewrite, zero actionable content
+for a Claude Code session.
 
-### Raíz del submodule (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.gitattributes`, `.gitignore`)
-**Inertes** — efecto secundario del sparse checkout para un paquete npm que nunca se instala
-aquí. `LICENSE` es la excepción: **obligatorio**, citado por el `NOTICE` raíz para
-cumplimiento MIT. `README.md`: inerte pero legítimo como documentación de procedencia.
+### Submodule root (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.gitattributes`, `.gitignore`)
+**Inert** — side effect of sparse checkout for an npm package that's never installed
+here. `LICENSE` is the exception: **mandatory**, cited by the root `NOTICE` for MIT
+compliance. `README.md`: inert but legitimate as provenance documentation.
 
 ---
 
-## 7. Recursos que deben eliminarse
+## 7. Resources that should be deleted
 
-- `md/MIGRATION.MD` — obsoleto, contradice el estado real del código.
-- `skills/_shared/review-ledger-contract.md` vendorizado — huérfano, ya existe mejor en
-  gentle-ai nativo.
-- `docs/native-authority-architecture.md` del manifiesto lazy-load (el archivo puede seguir
-  materializado por el sparse checkout, pero no debe inyectarse).
-- Referencia a `log_info` en `CONTRIBUTING.md` — helper que no existe.
-- Ruta hardcodeada de máquina de desarrollo en `tests/libs`/`helpers.bash`, y andamiaje de
-  stub de Python ya no utilizado por ningún script actual.
+- `md/MIGRATION.MD` — obsolete, contradicts the real state of the code.
+- Vendored `skills/_shared/review-ledger-contract.md` — orphaned, a better version
+  already exists natively in gentle-ai.
+- `docs/native-authority-architecture.md` from the lazy-load manifest (the file can stay
+  materialized by the sparse checkout, but shouldn't be injected).
+- The `log_info` reference in `CONTRIBUTING.md` — a helper that doesn't exist.
+- Hardcoded developer-machine path in `tests/libs`/`helpers.bash`, and Python stub
+  scaffolding no longer used by any current script.
 
-## 8. Recursos que deben permanecer
+## 8. Resources that should remain
 
-- Los 6 scripts de hooks y `gentle_ai.sh` (con las correcciones puntuales de la fase 0/3 del
-  roadmap).
-- `plugin/claude-code/skills/gentle-ai/SKILL.md` — identidad del harness, insustituible.
-- Los 4 prompts operacionales adaptados (`gpr`, `gcl`, `gis`, `gwr`).
-- `vendor/gentle-pi/skills/gentle-ai/SKILL.md` (versión Pi) — correctamente suprimida, cero
-  costo real.
-- `vendor/gentle-pi/assets/support/*`, `orchestrator-memory.md`, `docs/review-integration.md`,
-  `docs/skill-style-guide.md` — agnósticos y de valor, aun si algún día se promueven a
-  gentle-ai no dejan de ser correctos aquí mientras tanto.
-- `LICENSE` vendorizado — obligación legal.
-- Toda la suite de tests (con el gap de `subagent-stop.sh` cerrado).
+- The 6 hook scripts and `gentle_ai.sh` (with the point fixes from roadmap phases 0/3).
+- `plugin/claude-code/skills/gentle-ai/SKILL.md` — the harness's identity, irreplaceable.
+- The 4 adapted operational prompts (`gpr`, `gcl`, `gis`, `gwr`).
+- `vendor/gentle-pi/skills/gentle-ai/SKILL.md` (Pi version) — correctly suppressed, zero
+  real cost.
+- `vendor/gentle-pi/assets/support/*`, `orchestrator-memory.md`,
+  `docs/review-integration.md`, `docs/skill-style-guide.md` — agnostic and valuable, even
+  if someday promoted to gentle-ai they remain correct here in the meantime.
+- Vendored `LICENSE` — legal obligation.
+- The entire test suite (with the `subagent-stop.sh` gap closed).
 
-## 9. Recursos que deberían moverse a Gentle-AI
+## 9. Resources that should move to Gentle-AI
 
-- `contracts/review-integration/v1/` completo — es el protocolo del propio binario;
-  vendorizarlo vía gentle-pi es una ruta indirecta para algo que gentle-ai podría publicar o
-  exponer directamente.
-- Los 10 skills agnósticos ya duplicados nativamente (`branch-pr`, `chained-pr`,
-  `cognitive-doc-design`, `comment-writer`, `issue-creation`, `judgment-day`, `skill-creator`,
-  `skill-improver`, `skill-registry`, `work-unit-commits`) — no requieren "moverse" porque
-  **ya están** en gentle-ai; lo que debe moverse es la dependencia de gentle-claude, de
-  "vendorizar desde gentle-pi" a "confiar en `gentle-ai install`".
-- Los 22 agentes de `assets/agents/` con equivalente nativo confirmado — misma lógica.
-- La taxonomía de `classify_command()` (hard-deny/confirm/allow) — hoy vive por separado en
-  bash (gentle-claude) y TypeScript (gentle-pi); necesita una fuente única versionada, y el
-  lugar natural es gentle-ai, ya que ninguno de los dos hosts debería ser la autoridad.
+- The full `contracts/review-integration/v1/` — it's the binary's own protocol;
+  vendoring it via gentle-pi is an indirect path for something gentle-ai could publish or
+  expose directly.
+- The 10 agnostic skills already natively duplicated (`branch-pr`, `chained-pr`,
+  `cognitive-doc-design`, `comment-writer`, `issue-creation`, `judgment-day`,
+  `skill-creator`, `skill-improver`, `skill-registry`, `work-unit-commits`) — they don't
+  need "moving" because they **already are** in gentle-ai; what needs to move is
+  gentle-claude's dependency, from "vendor from gentle-pi" to "trust
+  `gentle-ai install`".
+- The 22 agents in `assets/agents/` with a confirmed native equivalent — same logic.
+- The `classify_command()` taxonomy (hard-deny/confirm/allow) — today it lives
+  separately in bash (gentle-claude) and TypeScript (gentle-pi); it needs a single
+  versioned source, and the natural place is gentle-ai, since neither host should be the
+  authority.
 
-## 10. Recursos que deberían reutilizarse directamente (ya nativos — dejar de vendorizar)
+## 10. Resources that should be reused directly (already native — stop vendoring)
 
-Esta es la categoría que más cambia respecto del planteo original: no son recursos por
-promover a futuro, **ya existen hoy** en `gentle-ai` instalado, con mejor formato que la copia
-vendorizada:
+This is the category that changes the most compared to the original framing: these
+aren't resources to promote in the future, **they already exist today** in installed
+`gentle-ai`, in a better format than the vendored copy:
 
-- Los 4 lentes de review (`review-risk`, `review-readability`, `review-reliability`,
+- The 4 review lenses (`review-risk`, `review-readability`, `review-reliability`,
   `review-resilience`) + `review-refuter`.
-- Los 3 roles de Judgment Day (`jd-judge-a`, `jd-judge-b`, `jd-fix-agent`).
-- Los 12 agentes de fase SDD (`sdd-apply` … `sdd-verify`) y los comandos slash
-  correspondientes.
-- El formato de skill registry (`.atl/skill-registry.md`) y su generación vía
+- The 3 Judgment Day roles (`jd-judge-a`, `jd-judge-b`, `jd-fix-agent`).
+- The 12 SDD phase agents (`sdd-apply` … `sdd-verify`) and their corresponding slash
+  commands.
+- The skill registry format (`.atl/skill-registry.md`) and its generation via
   `gentle-ai skill-registry refresh`.
 
-La condición para "dejar de vendorizar" no es automática: requiere confirmar que un
-`gentle-ai install`/`sync` para Claude Code sea un prerrequisito documentado del harness (hoy
-no lo es — el harness se instala solo, vía marketplace, sin depender de haber corrido la CLI
-antes). Ese es exactamente el trade-off a resolver en el roadmap (fase 2).
+The condition for "stop vendoring" isn't automatic: it requires confirming that a
+`gentle-ai install`/`sync` for Claude Code is a documented prerequisite of the harness
+(today it isn't — the harness installs on its own, via the marketplace, without depending
+on having run the CLI beforehand). That's exactly the trade-off resolved in the roadmap
+(phase 2).
 
-## 11. Estrategia para minimizar mantenimiento
+## 11. Strategy to minimize maintenance
 
-1. **Un solo test de "parity" contra la CLI instalada.** Antes de cada release, un test bats
-   debe correr `gentle-ai --help`/`gentle-ai doctor` reales y comparar contra lo que los
-   scripts asumen (nombres de comando, campos JSON) — así una CLI que cambia de superficie
-   rompe CI en vez de romperse en silencio en producción, como ya pasó con `gentle-ai mem`.
-2. **Eliminar toda restatación de política sin fuente única.** Los umbrales de riesgo hoy
-   están escritos 5 veces (bash, SKILL.md, README, skill Pi vendorizada, TypeScript
-   original). Un cambio de umbral requiere editar 5 lugares a mano; ninguno lo hace hoy.
-3. **Confiar en `gentle-ai install`/`sync` en vez de re-vendorizar.** Reduce la superficie de
-   archivos que este repo tiene que mantener sincronizados con gentle-pi.
-4. **Borrar documentación que ya no describe el código** (`md/MIGRATION.MD`) en el momento en
-   que queda obsoleta, no meses después.
+1. **A single "parity" test against the installed CLI.** Before every release, a bats
+   test should run real `gentle-ai --help`/`gentle-ai doctor` and compare against what
+   the scripts assume (command names, JSON fields) — so a CLI that changes its surface
+   breaks CI instead of breaking silently in production, as already happened with
+   `gentle-ai mem`.
+2. **Remove every policy restatement without a single source.** Risk thresholds are
+   today written 5 times (bash, SKILL.md, README, the vendored Pi skill, the original
+   TypeScript). Changing a threshold requires editing 5 places by hand; nothing enforces
+   that today.
+3. **Trust `gentle-ai install`/`sync` instead of re-vendoring.** Reduces the surface of
+   files this repo has to keep in sync with gentle-pi.
+4. **Delete documentation that no longer describes the code**
+   (`md/MIGRATION.MD`) the moment it goes stale, not months later.
 
-## 12. Estrategia para evitar duplicación futura
+## 12. Strategy to avoid future duplication
 
-- **Checklist obligatoria antes de vendorizar o escribir lógica nueva:** ¿existe ya en
-  `internal/assets/` o `internal/cli/` de gentle-ai? Si sí, no se copia — se documenta como
-  dependencia.
-- **Todo lo vendorizado temporalmente lleva una condición de remoción explícita** en el propio
-  archivo o en `ARCHITECTURE.md`, siguiendo el patrón ya usado en `inject_adapter_skills()`.
-- **Ningún harness reimplementa un clasificador de riesgo o de seguridad propio** — sólo
-  consume el que gentle-ai exponga, o, si gentle-ai deliberadamente delega esa política al
-  host (como el guard de comandos), esa política vive en un solo repo compartido entre hosts,
-  no copiada por adaptador.
-- **Revisión periódica de `internal/assets/` de gentle-ai contra `vendor/`** — cada release de
-  gentle-ai puede haber "alcanzado" contenido que hoy sigue vendorizado por costumbre.
+- **Mandatory checklist before vendoring or writing new logic:** does it already exist in
+  gentle-ai's `internal/assets/` or `internal/cli/`? If yes, don't copy it — document it
+  as a dependency.
+- **Everything vendored temporarily carries an explicit removal condition** in the file
+  itself or in `ARCHITECTURE.md`, following the pattern already used in
+  `inject_adapter_skills()`.
+- **No harness reimplements its own risk or security classifier** — it only consumes
+  what gentle-ai exposes, or, if gentle-ai deliberately delegates that policy to the host
+  (like the command guard), that policy lives in a single repo shared across hosts, not
+  copied per adapter.
+- **Periodic review of gentle-ai's `internal/assets/` against `vendor/`** — every
+  gentle-ai release may have "caught up" content that's still vendored out of habit.
 
 ---
 
-## 13. Roadmap de refactorización (checklist accionable)
+## 13. Refactoring roadmap (actionable checklist)
 
-### Fase 0 — Bugs activos
-Son roturas silenciosas hoy, no cuestiones de diseño — se arreglan antes de tocar arquitectura.
+### Phase 0 — Active bugs
+These are silent breakages today, not design questions — fix before touching
+architecture.
 
-- [ ] Arreglar `subagent-stop.sh`: quitar la llamada a `gentle-ai mem` inexistente, delegar la
-      captura pasiva al propio agente vía `mem_capture_passive` (MCP), no vía shell
-- [ ] Agregar `test_subagent_stop.bats`
-- [ ] Verificar si el `systemMessage` async de `session-stop.sh` llega a mostrarse; si no,
-      rediseñar la entrega del mensaje
+- [ ] Fix `subagent-stop.sh`: remove the call to nonexistent `gentle-ai mem`, delegate
+      passive capture to the agent itself via `mem_capture_passive` (MCP), not via shell
+- [ ] Add `test_subagent_stop.bats`
+- [ ] Verify whether `session-stop.sh`'s async `systemMessage` actually displays; if not,
+      redesign message delivery
 
-### Fase 1 — Riesgo del skill `release`
-Es el único hallazgo que puede llevar a una acción activamente incorrecta (publicar en el
-repo/paquete equivocado).
+### Phase 1 — `release` skill risk
+The only finding that can lead to an actively incorrect action (publishing to the wrong
+repo/package).
 
-- [x] Crear `plugin/claude-code/skills/release/SKILL.md` con el runbook real de gentle-claude
-      (tag → GitHub Release), mismo patrón que ya existe para `gentle-ai/SKILL.md`
+- [x] Create `plugin/claude-code/skills/release/SKILL.md` with gentle-claude's real
+      runbook (tag → GitHub Release), same pattern already used for `gentle-ai/SKILL.md`
 
-### Fase 2 — Decisión de dependencia
-Es la decisión que desbloquea todo el resto de la limpieza de `vendor/`.
+### Phase 2 — Dependency decision
+The decision that unblocks the rest of the `vendor/` cleanup.
 
-- [x] Definir si el harness exige `gentle-ai install`/`sync` como prerrequisito documentado
-- [x] Si sí: eliminar la duplicación del hook de skill-registry en `hooks.json`
-- [x] Empezar a retirar los skills/agentes ya nativos de `vendor/` (ver §10)
+- [x] Decide whether the harness requires `gentle-ai install`/`sync` as a documented
+      prerequisite
+- [x] If yes: remove the skill-registry hook duplication in `hooks.json`
+- [x] Start retiring the skills/agents from `vendor/` that are already native (see §10)
 
-### Fase 3 — Puente hacia `review start`
-Elimina la duplicación más riesgosa (política de seguridad de review) sin perder el fail-safe
-local.
+### Phase 3 — Bridge to `review start`
+Removes the riskiest duplication (review security policy) without losing the local
+fail-safe.
 
-- [x] Hacer que `pre-tool-use.sh` lea el tier vía `gentle-ai review status` (read-only) cuando
-      exista una receipt aplicable — nunca invocar `review start` desde el gate (violaría el
-      contrato de `vendor/gentle-pi/docs/review-integration.md`)
-- [x] Usar el tier que la CLI devuelva
-- [x] Dejar `classify_diff()` como fallback documentado si la CLI no responde — no como
-      árbitro único
+- [x] Make `pre-tool-use.sh` read the tier via `gentle-ai review status` (read-only) when
+      an applicable receipt exists — never invoke `review start` from the gate (would
+      violate the `vendor/gentle-pi/docs/review-integration.md` contract)
+- [x] Use the tier the CLI returns
+- [x] Keep `classify_diff()` as a documented fallback if the CLI doesn't respond — not as
+      the sole arbiter
 
-### Fase 4 — Fuente única para `classify_command()`
-Depende de coordinación con el mantenedor de gentle-ai (org `Gentleman-Programming`, sin
-relación con el dueño de este repo) — sin canal de comunicación real ni track record para que
-una propuesta cross-repo prospere hoy.
+### Phase 4 — Single source for `classify_command()`
+Depends on coordination with the gentle-ai maintainer (org `Gentleman-Programming`, no
+relation to this repo's owner) — no real communication channel or track record for a
+cross-repo proposal to succeed today.
 
-- [ ] Proponer a gentle-ai una lista canónica versionada de patrones peligrosos (JSON/YAML)
-- [ ] Consumida tanto por gentle-claude como por gentle-pi
+- [ ] Propose a canonical versioned list of dangerous patterns (JSON/YAML) to gentle-ai
+- [ ] Consumed by both gentle-claude and gentle-pi
 
-**Intentado y revertido (2026-07-26):** se probó re-acotar la fase a una extracción local —
-`classify_command()` leyendo un `command-risk-patterns.json` propio vía `jq`, en vez de las 8
-reglas en bash. Funcionaba (55/55 tests) pero se descartó tras pesar costo/beneficio: no
-resuelve la duplicación real con gentle-pi (el problema que le da origen a esta fase), y
-`classify_command()` corre en **todo** comando de Bash de este repo (no solo los riesgosos),
-así que el rediseño le agregaba hasta ~33 forks de `jq` por invocación al hot path de cada
-comando — costo medible en Windows, a cambio de un beneficio de mantenibilidad menor (8 reglas
-fijas que casi no cambian). Se revirtió a bash inline. No vale la pena resolver esta fase en
-solitario; queda parqueada hasta que haya coordinación real con gentle-ai.
+**Attempted and reverted (2026-07-26):** re-scoping the phase to a local extraction was
+tried — `classify_command()` reading its own `command-risk-patterns.json` via `jq`,
+instead of the 8 rules in bash. It worked (55/55 tests) but was scrapped after weighing
+cost/benefit: it doesn't solve the actual duplication with gentle-pi (the problem this
+phase exists to fix), and `classify_command()` runs on **every** Bash command in this
+repo (not just risky ones), so the redesign added up to ~33 `jq` forks per invocation to
+the hot path of every command — a measurable cost on Windows, for a minor maintainability
+gain on 8 fixed rules that rarely change. Reverted to inline bash. Not worth solving this
+phase alone; it stays parked until real coordination with gentle-ai exists.
 
-### Fase 5 — Limpieza de vendor/
-Bajo riesgo, alto valor de claridad — se hace en paralelo a lo anterior.
+### Phase 5 — vendor/ cleanup
+Low risk, high clarity value — done in parallel with the above.
 
-- [ ] Retirar `docs/native-authority-architecture.md` del manifiesto lazy
-- [ ] Ampliar el filtro de contexto Pi en `SKILL.md` (cubrir `gentle-ai-explore/worker/verify`,
+- [x] Remove `docs/native-authority-architecture.md` from the lazy manifest (already
+      handled by Phase 2's sparse-checkout narrowing — nothing to do)
+- [x] Extend the Pi context filter in `SKILL.md` (cover `gentle-ai-explore/worker/verify`,
       `pi-subagents`, `ask_user_question`, `/gentle:sdd-preflight`)
-- [ ] Borrar `md/MIGRATION.MD`
-- [ ] Corregir referencia a `log_info` en `CONTRIBUTING.md`
-- [ ] Limpiar ruta hardcodeada y andamiaje Python muerto en `tests/libs`/`helpers.bash`
+- [x] Delete `md/MIGRATION.MD`
+- [x] Fix the `log_info` reference in `CONTRIBUTING.md`
+- [x] Clean up the hardcoded path and dead Python scaffolding in
+      `tests/libs`/`helpers.bash`
 
-### Fase 6 — Contratos
-Depende de gentle-ai — se coordina en paralelo, no bloquea el resto del roadmap.
+Shipped `6fda08c` (2026-07-26), released in `v0.2.0-beta.6`.
 
-- [ ] Evaluar con gentle-ai si `contracts/review-integration/v1/` puede consumirse
-      directamente desde su repo/release en vez de vía gentle-pi
+### Phase 6 — Contracts
+Depends on gentle-ai — coordinated in parallel, doesn't block the rest of the roadmap.
+
+- [x] Evaluate with gentle-ai whether `contracts/review-integration/v1/` can be consumed
+      directly from its repo/release instead of via gentle-pi
+
+**Resolved differently than planned (2026-07-31):** the cross-repo coordination gap never
+closed (same blocker as Phase 4 — no real channel with the gentle-ai maintainer). But a
+full vendor re-audit (§16) confirmed nothing in this repo ever parsed those 18 files —
+only the string identifier `gentle-ai.review-integration/v1` is passed to the CLI (§6
+already noted this). So the checklist item resolved by removing the dependency rather
+than by moving it: `contracts/` is excluded from the sparse checkout entirely, and this
+repo carries zero copy of the wire protocol, vendored or otherwise.
 
 ---
 
-## 14. Arquitectura objetivo v1.0 y soporte multi-host
+## 14. Target v1.0 architecture and multi-host support
 
 ```
-gentle-ai  (motor + adaptador nativo de 16 hosts + skills/agents empaquetados)
+gentle-ai  (engine + native 16-host adapter + packaged skills/agents)
    │
-   │  install / sync escribe config, skills y agents nativos por host
+   │  install / sync writes config, skills, and native agents per host
    ▼
-~/.claude/, ~/.cursor/, ~/.codex/, ~/.windsurf/, ...  (ya resuelto por gentle-ai, sin harness)
+~/.claude/, ~/.cursor/, ~/.codex/, ~/.windsurf/, ...  (already solved by gentle-ai, no harness)
 
-   ┌─ para hosts CON ciclo de vida de sesión propio (hooks en vivo) ─┐
-   │                                                                  │
-   ▼                                                                  ▼
+   ┌─ for hosts WITH their own session lifecycle (live hooks) ─┐
+   │                                                             │
+   ▼                                                             ▼
 gentle-harnesses/plugin/claude-code/     gentle-harnesses/plugin/<host>/
-   hooks.json + scripts bash                 mismo patrón, otro protocolo
-   (SOLO traducción de protocolo,             de hooks/eventos del host
-    nada de política de ecosistema)
+   hooks.json + bash scripts                 same pattern, different host
+   (ONLY protocol translation,                hook/event protocol
+    no ecosystem policy)
 ```
 
-La pregunta original — "¿cómo organizar el repo si mañana aparecen `gentle-cursor`,
-`gentle-codex`, `gentle-windsurf`?" — tiene una respuesta más acotada de lo que sugiere el
-nombre: **gentle-ai ya resuelve Cursor, Codex y Windsurf a nivel de instalación** (los 16
-adaptadores de `internal/agents/` ya los cubren). Un nuevo `plugin/<host>/` dentro de
-`gentle-harnesses` sólo se justifica para hosts que, como Claude Code, exponen un mecanismo de
-hooks en tiempo de sesión que valga la pena cablear — si un host no tiene ese mecanismo, no
-hace falta ningún harness para él, `gentle-ai install` alcanza.
+The original question — "how should the repo be organized if `gentle-cursor`,
+`gentle-codex`, `gentle-windsurf` show up tomorrow?" — has a narrower answer than the
+name suggests: **gentle-ai already solves Cursor, Codex, and Windsurf at the install
+level** (the 16 adapters in `internal/agents/` already cover them). A new
+`plugin/<host>/` inside `gentle-harnesses` is only justified for hosts that, like Claude
+Code, expose a session-time hook mechanism worth wiring — if a host doesn't have that
+mechanism, it needs no harness at all, `gentle-ai install` is enough.
 
-Para los que sí lo necesiten, la estructura ya adoptada
-(`plugin/<host>/{hooks,scripts,skills,prompts,tests}/`) es correcta y escala sin cambios —
-cada carpeta de host es un adaptador delgado, ninguno vendoriza contenido agnóstico por
-separado. El `vendor/gentle-pi/` actual debería, a mediano plazo, reducirse a lo que ningún
-otro mecanismo cubre: contenido de Pi verdaderamente específico (que no aplica a ningún otro
-host) y nada más — todo lo agnóstico pasa a ser una dependencia de `gentle-ai install`,
-compartida por todos los `plugin/<host>/` sin que ninguno tenga que volver a traerla.
-
----
-
-## 15. Apéndice — Economía de sesión (delegación, cache, `/clear`)
-
-Nota agregada durante la ejecución de la Fase 0 de este roadmap, con datos reales de esa
-ejecución — no proyecciones.
-
-### 15.1 Delegar a subagentes no ahorra tokens — ahorra contexto propio
-
-El fix de Fase 0 (dos scripts de ~15 líneas + dos archivos de test) se delegó a un subagente
-por regla explícita de `CLAUDE.md` ("2+ archivos no triviales → delegar"). Costo real medido:
-**106.067 tokens y 47 llamadas a herramientas** en el subagente, más el overhead propio de
-armar el prompt de delegación, leer el reporte, y releer los 4 archivos para verificar. Hacerlo
-inline hubiera costado una fracción de eso — el fix ya estaba diagnosticado con línea exacta
-desde el audit, no había nada que "explorar".
-
-**Conclusión:** delegar optimiza *mi* ventana de contexto en una sesión larga (evita que el
-contenido completo de archivos leídos se quede pegado en el historial y empuje a compactación
-antes), no el costo total en tokens — que normalmente sube, no baja. La regla de umbral por
-cantidad de archivos en `CLAUDE.md` no pesa el tamaño/complejidad real de la tarea; para fixes
-chicos y ya diagnosticados, delegar es plata tirada.
-
-### 15.2 Capacidad por sesión — no hay techo duro de tokens
-
-Sonnet 5 (`claude-sonnet-5`) corre con ventana de contexto de **1M tokens** (ese valor es el
-default y también el máximo — no es un tier separado que haya que activar) y 128K tokens de
-salida máxima. Claude Code además capa por encima su propia compactación automática: cuando la
-conversación crece, el contexto viejo se resume automáticamente y el trabajo sigue sin
-interrupción — no existe un punto donde la sesión "se corta" por tamaño.
-
-Lo que sí limita en la práctica:
-
-- **Costo, no tokens disponibles.** La API es *stateless* — cada request reenvía el historial
-  completo. Con prompt caching activo, ese historial se sirve mayormente desde cache (~0.1x el
-  costo de input normal) — pero cada evento de compactación reescribe un tramo del historial en
-  un resumen, lo cual invalida el prefijo cacheado en ese punto y fuerza una escritura de cache
-  cara (1.25x–2x) para todo lo que sigue. Sesiones muy largas con compactaciones frecuentes
-  pagan ese costo repetidas veces.
-- **Pérdida de fidelidad.** Un resumen de compactación es lossy — detalles finos de intercambios
-  viejos (número de línea exacto, redacción exacta de una decisión) se pueden perder o
-  aproximar mal después de resumirse.
-
-### 15.3 Cuándo hacer `/clear`
-
-No es una decisión basada en cantidad de tokens — es una decisión de límite de tarea:
-
-- **Hacé `/clear` al arrancar trabajo genuinamente no relacionado** (otro proyecto, otro
-  objetivo). Evita pagar por re-enviar/cachear historial irrelevante y evita por completo el
-  costo de compactación sobre ese contenido viejo.
-- **No hagas `/clear` en medio de un hilo de trabajo relacionado** (como esta sesión: audit →
-  fixes → commit → esta misma nota). Perder ese contexto obliga a re-derivar todo lo que ya se
-  estableció — mucho más caro que dejar que la compactación automática lo resuma.
-- Si el trabajo es una iniciativa sostenida a lo largo de todo un día, dejá que la compactación
-  automática haga su trabajo en vez de limpiar manualmente — es exactamente para eso que existe.
+For those that do need it, the structure already adopted
+(`plugin/<host>/{hooks,scripts,skills,prompts,tests}/`) is correct and scales without
+changes — each host folder is a thin adapter, none of them vendor agnostic content
+separately. The current `vendor/gentle-pi/` should, medium-term, shrink to what no other
+mechanism covers: content genuinely specific to Pi (that doesn't apply to any other host)
+and nothing else — everything agnostic becomes a `gentle-ai install` dependency, shared
+by every `plugin/<host>/` without any of them having to re-bring it.
 
 ---
 
-*Análisis basado en lectura directa de `ARCHITECTURE.md`, `MIGRATION-RESEARCH.md`, `NOTICE`,
-los 6 scripts de hooks completos, los 26 archivos de `vendor/gentle-pi/assets/agents/`, los 12
-skills vendorizados, los 18 archivos de `contracts/review-integration/v1/`, y el código fuente
-real de `gentle-ai@v1.49.0` (módulo Go cacheado localmente) contrastado contra el binario
-v2.1.11 instalado. Versión interactiva con navegación y tablas: ver artefacto publicado en esta
-conversación.*
+## 15. Appendix — Session economics (delegation, cache, `/clear`)
+
+Note added during execution of Phase 0 of this roadmap, with real data from that
+execution — not projections.
+
+### 15.1 Delegating to subagents doesn't save tokens — it saves your own context
+
+The Phase 0 fix (two ~15-line scripts + two test files) was delegated to a subagent per
+`CLAUDE.md`'s explicit rule ("2+ non-trivial files → delegate"). Real measured cost:
+**106,067 tokens and 47 tool calls** in the subagent, plus the overhead of building the
+delegation prompt, reading the report, and re-reading the 4 files to verify. Doing it
+inline would have cost a fraction of that — the fix was already diagnosed with the exact
+line from the audit, there was nothing to "explore".
+
+**Conclusion:** delegating optimizes *my own* context window in a long session (it keeps
+the full content of read files from staying pinned in history and pushing toward
+compaction sooner), not total token cost — which usually goes up, not down. `CLAUDE.md`'s
+file-count threshold rule doesn't weigh the task's real size/complexity; for small,
+already-diagnosed fixes, delegating is money thrown away.
+
+### 15.2 Per-session capacity — there's no hard token ceiling
+
+Sonnet 5 (`claude-sonnet-5`) runs with a **1M token** context window (that value is both
+the default and the maximum — not a separate tier to activate) and 128K max output
+tokens. Claude Code additionally layers its own automatic compaction on top: as the
+conversation grows, old context gets automatically summarized and work continues without
+interruption — there's no point where the session "cuts off" by size.
+
+What actually limits things in practice:
+
+- **Cost, not available tokens.** The API is *stateless* — every request resends the full
+  history. With prompt caching active, that history is served mostly from cache (~0.1x
+  the cost of normal input) — but every compaction event rewrites a chunk of history into
+  a summary, which invalidates the cached prefix at that point and forces an expensive
+  cache write (1.25x–2x) for everything that follows. Very long sessions with frequent
+  compactions pay that cost repeatedly.
+- **Fidelity loss.** A compaction summary is lossy — fine details from old exchanges
+  (an exact line number, the exact wording of a decision) can get lost or approximated
+  poorly after summarizing.
+
+### 15.3 When to run `/clear`
+
+It's not a token-count decision — it's a task-boundary decision:
+
+- **Run `/clear` when starting genuinely unrelated work** (a different project, a
+  different goal). Avoids paying to resend/cache irrelevant history and entirely avoids
+  the compaction cost on that old content.
+- **Don't run `/clear` in the middle of a related work thread** (like this session:
+  audit → fixes → commit → this very note). Losing that context forces re-deriving
+  everything already established — much more expensive than letting automatic compaction
+  summarize it.
+- If the work is a sustained initiative across a whole day, let automatic compaction do
+  its job instead of clearing manually — that's exactly what it's for.
+
+---
+
+## 16. Progress since the original analysis (2026-07-26 → 2026-07-31)
+
+This section is the living continuation of §13's roadmap — updated as phases ship instead
+of staying frozen at the analysis date. Detailed evidence for each item lives in Engram
+(`gentle-harnesses` project); this is the compressed trail.
+
+**Releases:**
+- `v0.2.0-beta.5` (`6e37f43`) — Phases 0-3: silent hook bugs fixed, `release` skill
+  written, dependency decision made, `pre-tool-use.sh` bridged to `gentle-ai review
+  status` (read-only, never `review start` from the gate — see the Phase 3 note above
+  about the contract violation a first attempt hit and how it was corrected).
+- `v0.2.0-beta.6` (`075aa27`) — Phase 5 vendor cleanup (checkboxes above updated to
+  match) plus the Phase 4 attempt-and-revert written up as parked docs.
+- `v0.2.0-beta.7` (`c5d8c8a`) — first release where the `release` gate was genuinely
+  satisfied (not bypassed): `gentle-ai review validate --gate release` wants 5
+  release-evidence categories with no fixed schema; `skills/release/SKILL.md` now
+  generates minimal-but-honest JSON for each instead of leaving the gate unsatisfiable.
+- `v0.2.0-beta.8` (`be1e11a`) — `user-prompt-submit.sh`'s final `jq` call guarded
+  (`eeb1af8`); `vendor/gentle-pi` bumped to `v2.1.2` (`08bec6e`, v1→v2 review-integration
+  contract migration noted but deferred — this repo's 3 `gentle_ai.sh` call sites stay on
+  v1, which the installed CLI still resolves); `inject_asset_manifest()` stopped injecting
+  `orchestrator-delegation.md`, `orchestrator-memory.md`, `orchestrator-skills.md`,
+  `sdd-orchestrator-workflow.md`, the 4 `chains/*.chain.md`, and `support/*.md` (`4105514`)
+  — **a bigger native-coverage finding than §10 originally scoped**: not just the 4
+  categories §10 lists, but the whole orchestrator/delegation/memory/SDD-workflow/TDD/
+  review-chain layer, because `gentle-ai install`'s *global* Claude Code output
+  (`~/.claude/CLAUDE.md`'s Agent Teams Lite section, `skills/_shared/`,
+  `skills/sdd-{apply,verify}/`, `skills/skill-creator/references/`, the native
+  `review-*` agents backing `judgment-day`) already covers all of it, adapted for Claude
+  Code rather than left in Pi's dialect. §6's "MIXED" verdict on
+  `assets/orchestrator*.md`/`chains/`/`support/` is superseded by this finding.
+
+**2026-07-31 session (uncommitted at analysis-refresh time — see repo history for the
+actual landing commit):**
+- Re-audited `vendor/gentle-pi`'s working tree against `inject_asset_manifest()`/
+  `inject_adapter_skills()` post-beta.8 and found the trim above left 12 files checked out
+  but referenced by nothing: the 4 orchestrator/SDD-workflow docs, all 4 `chains/`, all 3
+  `support/`, and `docs/skill-style-guide.md` (§6/§8 above still call the last one "keep,
+  actively loaded" — that was true pre-beta.8, stale after it). Sparse-checkout narrowed
+  from 19 tracked paths to the 7 that are genuinely read: `docs/review-integration.md`,
+  the 4 `assets/agents/{gentle-ai-explore,gentle-ai-worker,gentle-ai-verify,
+  review-validator}.md`, and `skills/{gentle-ai,release}/SKILL.md`.
+- **Found the sparse-checkout mechanism itself was never real.** It lives under
+  `.git/modules/vendor/gentle-pi/info/sparse-checkout`, which is local git plumbing —
+  `git add vendor/gentle-pi` only stages the submodule's pinned commit, never the
+  checkout scope. `.github/workflows/{ci,release}.yml` both do a plain
+  `submodules: recursive` checkout with no sparse-checkout applied. So every phase-2/4/5
+  "narrowing" up to this point only ever affected this one local clone — CI and any fresh
+  clone always got the full, untrimmed `vendor/gentle-pi`. Fixed by tracking the pattern
+  list at `plugin/claude-code/scripts/vendor-sparse-checkout.patterns` and adding
+  `sync-vendor-sparse-checkout.sh` to apply it, wired into both CI workflows and
+  documented in `DEVELOPMENT.md`.
+- **Known follow-up, not yet fixed:** `ARCHITECTURE.md:95-113` and `docs/flow.md:65-74`
+  still describe `inject_asset_manifest()` emitting the 8 orchestrator/chain paths that
+  `4105514` removed — stale documentation of the pre-beta.8 behavior.
+- **Pending, undecided:** `vendor/gentle-pi`'s working tree was manually fast-forwarded
+  to `5fe1beaa` (11 commits past the pinned `v2.1.2`/`3b6b3d2` — none touch tracked
+  paths' file *structure*, only content: `docs/review-integration.md` gained a refined
+  `--consent declined` authorization model and a `--locale` flag; the 4 vendored
+  `review-*.md` agents changed too but this repo excludes them and uses its own local
+  agents). The outer repo's gitlink is still pinned at `3b6b3d2` — whether to formally
+  bump the pin is an open decision as of this refresh.
+
+---
+
+*Analysis based on direct reading of `ARCHITECTURE.md`, `MIGRATION-RESEARCH.md`,
+`NOTICE`, all 6 hook scripts, the 26 files in `vendor/gentle-pi/assets/agents/`, the 12
+vendored skills, the 18 files in `contracts/review-integration/v1/`, and the real
+`gentle-ai@v1.49.0` source code (Go module cached locally) checked against the installed
+v2.1.11 binary. Interactive version with navigation and tables: see the artifact
+published in this conversation.*

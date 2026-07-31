@@ -24,6 +24,14 @@ If you cloned without `--recurse-submodules`:
 git submodule update --init --recursive
 ```
 
+Sparse-checkout state lives under `.git/` and is never committed by `git add
+vendor/gentle-pi` — every clone (including CI) must reapply it after `git
+submodule update`:
+
+```bash
+bash plugin/claude-code/scripts/sync-vendor-sparse-checkout.sh
+```
+
 ## Run tests
 
 Install bats dependencies (once):
@@ -97,19 +105,22 @@ If a skill in `vendor/gentle-pi/skills/` needs a Claude Code-specific version:
 2. The injection layer in `user-prompt-submit.sh` gives priority to plugin skills over
    same-named vendor skills automatically — no config needed.
 
-## Expand vendor sparse checkout
+## Expand or narrow the vendor sparse checkout
 
-To add a new directory from gentle-pi:
+The pattern list is tracked at
+`plugin/claude-code/scripts/vendor-sparse-checkout.patterns` (gitignore-style,
+non-cone) — it, not `.git/`, is the source of truth. To change what's checked
+out of `vendor/gentle-pi`:
 
-```bash
-cd vendor/gentle-pi
-git sparse-checkout add <directory>
-cd ../..
-git add vendor/gentle-pi
-git commit -m "feat(vendor): add <directory> to sparse checkout"
-```
+1. Edit `vendor-sparse-checkout.patterns`
+2. Reapply it: `bash plugin/claude-code/scripts/sync-vendor-sparse-checkout.sh`
+3. Update `inject_asset_manifest()`/`inject_adapter_skills()` in
+   `user-prompt-submit.sh` if you added or removed something they should read
+4. `git add plugin/claude-code/scripts/vendor-sparse-checkout.patterns` and commit
 
-Then update `inject_asset_manifest()` in `user-prompt-submit.sh` to include the new paths.
+Only keep paths that something in `plugin/` actually reads — check
+`inject_asset_manifest()`/`inject_adapter_skills()` in `user-prompt-submit.sh`
+before adding a pattern, and remove one as soon as its last reader is deleted.
 
 ## Hook development
 
