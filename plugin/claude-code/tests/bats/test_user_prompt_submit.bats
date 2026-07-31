@@ -3,21 +3,23 @@
 
 load "helpers"
 
-@test "no gentle-ai and no registry still emits asset manifest" {
+@test "no gentle-ai and no registry produces no output" {
     create_stub_jq
-    # No gentle-ai stub, no registry file — vendor assets are always injected
+    # No gentle-ai stub, no registry file, no vendor content is ever injected
+    # anymore (see HARNESS-AUDIT.md SS16) — nothing populates $parts.
     run bash "$SCRIPTS_DIR/user-prompt-submit.sh"
     assert_success
-    assert_output --partial "Adapter Assets"
+    assert_output ""
 }
 
-@test "asset manifest keeps only vendor content with no native Claude Code equivalent" {
+@test "vendor/gentle-pi content is never injected, redundant with gentle-ai's global install" {
     create_stub_jq
+    create_stub_gentle_ai
+    export STUB_GENTLE_AI_REVIEW_STATUS='{"action":"in-progress","next_transition":{"kind":"execute","execute":{"operation":"pre-commit"}}}'
     run bash "$SCRIPTS_DIR/user-prompt-submit.sh"
     assert_success
-    # Unique to gentle-pi — no equivalent shipped by gentle-ai's global install
-    assert_output --partial "Doc — review integration"
-    # Redundant with gentle-ai's global install — must not be injected
+    refute_output --partial "Adapter Assets"
+    refute_output --partial "Doc — review integration"
     refute_output --partial "Agent —"
     refute_output --partial "Delegation rules"
     refute_output --partial "Memory protocol"
@@ -85,8 +87,11 @@ load "helpers"
     # not include it. /usr/bin and /bin stay so cat/rm/tr (needed by bats'
     # own teardown and the script) remain available.
     export PATH="/usr/bin:/bin:/usr/local/bin"
-    # No gentle-ai stub, no registry file — vendor assets alone populate $parts,
-    # forcing the script down to the final printf | jq call.
+    # No gentle-ai stub (its output needs jq to parse anyway). The skill
+    # registry path needs no jq at all, so it alone populates $parts, forcing
+    # the script down to the final printf | jq call.
+    mkdir -p "$CLAUDE_PROJECT_DIR/.atl"
+    echo "skill: test" > "$CLAUDE_PROJECT_DIR/.atl/skill-registry.md"
     run bash "$SCRIPTS_DIR/user-prompt-submit.sh"
     assert_success
     refute_output --partial "command not found"

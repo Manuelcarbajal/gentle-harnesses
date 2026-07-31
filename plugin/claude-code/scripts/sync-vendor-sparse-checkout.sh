@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Applies vendor-sparse-checkout.patterns to vendor/gentle-pi so the working
-# tree only contains what inject_asset_manifest()/inject_adapter_skills() in
-# user-prompt-submit.sh actually read. Run after any `git submodule update`
-# or clone — sparse-checkout state lives in .git/ and is never committed by
-# `git add vendor/gentle-pi`, so every clone (including CI) must reapply it.
+# tree only contains what user-prompt-submit.sh actually reads (currently:
+# nothing under gentle-pi's content dirs — see HARNESS-AUDIT.md SS16; only
+# root files like LICENSE/README stay, for provenance/license compliance).
+# Run after any `git submodule update` or clone — sparse-checkout state lives
+# in .git/ and is never committed by `git add vendor/gentle-pi`, so every
+# clone (including CI) must reapply it.
 set -euo pipefail
 
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"

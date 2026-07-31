@@ -33,23 +33,6 @@ adapter_skill_rows() {
 # Priority: plugin skills override vendor skills of the same name.
 # REMOVE this function if gentle-ai adds native support for these paths.
 # ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-# inject_asset_manifest: emit a lightweight path manifest for vendor assets.
-# Agents read the file when the workflow applies — no content injected eagerly.
-# REMOVE this function if gentle-ai adds native asset path injection.
-# ---------------------------------------------------------------------------
-inject_asset_manifest() {
-    # Everything gentle-pi vendors except this one doc now has a native
-    # Claude-Code-adapted equivalent (gentle-ai's global install) or was never
-    # referenced by any Claude Code workflow to begin with — see HARNESS-AUDIT.md
-    # SS16. review-integration.md is the sole exception: the wire-protocol doc for
-    # gentle-ai's review CLI, agnostic, with no duplicate anywhere in this repo.
-    local review_doc="$ADAPTER_ROOT/vendor/gentle-pi/docs/review-integration.md"
-    [ -f "$review_doc" ] || return 0
-
-    printf '## Adapter Assets\n\nLoad the file when the workflow applies — do not preload.\n- Doc — review integration: `%s`\n' "$review_doc"
-}
-
 inject_adapter_skills() {
     local registry="$1"
     local plugin_dir="$ADAPTER_ROOT/plugin/claude-code/skills"
@@ -103,11 +86,8 @@ if [ -n "$action" ]; then
     fi
 fi
 
-asset_manifest=$(inject_asset_manifest)
-
 parts=()
 [ -n "$registry" ]        && parts+=("## Gentle-AI Skill Registry\n\n${registry}")
-[ -n "$asset_manifest" ]  && parts+=("${asset_manifest}")
 [ -n "$review_summary" ]  && parts+=("## Review Lifecycle\n\n${review_summary}")
 
 if [ ${#parts[@]} -eq 0 ]; then
