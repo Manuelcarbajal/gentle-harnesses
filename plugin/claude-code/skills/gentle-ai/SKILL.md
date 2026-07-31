@@ -13,6 +13,12 @@ Claude Code adapter for the gentle-ai ecosystem. Enforces review discipline, SDD
 3. Before committing, run `gentle-ai review validate --gate pre-commit --cwd <cwd>`.
 4. Before pushing or opening a PR, run `gentle-ai review validate --gate pre-push --cwd <cwd>`.
 
+**To actually run the review in Claude Code, use the `/gentle-review` skill.** It drives this
+lifecycle from the main thread and submits results via `gentle-ai review capture-result`. Do NOT
+dispatch the `review-*` lens subagents — they have no `Bash` and receive no injected frozen-tree
+context, so they return `incomplete`; `/gentle-review` does the frozen-tree inspection inline
+instead. For high-risk changes, also run `judgment-day` (two blind judges) for adversarial separation.
+
 ## Risk-based lens selection
 
 Determine tier from the diff before starting review:
@@ -48,21 +54,3 @@ For complex, risky, or ambiguous work: use SDD phases — explore → propose �
 For simple tasks with a clear, bounded scope: skip SDD entirely.
 
 When in doubt about complexity, use `/sdd-explore` before starting implementation.
-
-## Vendor asset context
-
-Assets and skills in `vendor/gentle-pi/` originate from gentle-pi (the Pi platform counterpart).
-When loading these files, apply this filter — the following references are Pi-specific and do not
-exist in Claude Code:
-
-- `subagent_run` — Pi's native subagent launcher; use the `Agent` tool instead
-- `~/.pi/`, `.pi/`, `pi install` — Pi local runtime paths and package manager
-- `extensions/startup-banner.ts`, `extensions/pi-pretty.ts` — Pi TUI extensions; no equivalent
-- `pi-mono`, `packages/ai/`, `packages/tui/`, `packages/coding-agent/` — Pi mono-repo paths
-- `earendil-works` — Pi organization; Claude Code equivalent is `Gentleman-Programming`
-- `gentle-ai-explore`, `gentle-ai-worker`, `gentle-ai-verify` — Pi's package-owned explore/write/verify subagent roles; no confirmed native equivalent — fall back to the `Agent` tool
-- `pi-subagents` — Pi's subagent model/thinking resolver (`.pi/settings.json`, `.pi/subagents.json`); no equivalent, Claude Code resolves this via agent frontmatter and the `Agent` tool's `model` parameter
-- `ask_user_question` — Pi's structured question tool; no equivalent, ask directly in conversation text instead
-- `/gentle:sdd-preflight` — Pi's SDD preflight slash command; Claude Code equivalent is `sdd-init`
-
-Everything else in vendor assets is platform-agnostic and applies as written.

@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`/gentle-review` skill — the supported native review path for Claude Code**
+  (`plugin/claude-code/skills/gentle-review/SKILL.md`). Drives the gentle-ai negotiated review
+  lifecycle entirely from the main thread (which has full `Bash`) instead of dispatching the
+  `review-*` lens subagents. Those subagents cannot run the mandated frozen-tree `git diff`/`cat-file`
+  inspection (no `Bash` grant), and Claude Code has no seam to inject the frozen trees into a
+  subagent, so the reviewer work runs in the orchestrator thread and results are submitted through
+  the binary's additive headless capability, `gentle-ai review capture-result`. The skill routes
+  strictly from the native `next_transition`, keeps the byte-exact frozen-tree inspection, handles
+  the `consent/v2` blocking envelope (`--locale es`), and plugs into the existing
+  `pre-tool-use.sh` receipt gate. It documents the one accepted tradeoff — a single actor reviewing
+  has no blind adversarial separation — and points high-risk changes at `judgment-day` (two blind
+  judges, which works natively because its judges read files directly rather than through the
+  frozen-tree contract).
+
+### Changed
+
+- **`skills/gentle-ai/SKILL.md` now hands off review execution to `/gentle-review`.** The
+  "Review lifecycle" section points the model at the `/gentle-review` skill as the way to actually
+  run a review in Claude Code — disambiguating it from the other "review"-named skills and steering
+  away from the non-functional `review-*` subagent path.
+
+### Removed
+
+- **Stale "Vendor asset context" section dropped from `skills/gentle-ai/SKILL.md`.** It documented
+  how to filter Pi-specific references when loading `vendor/gentle-pi/` files, but since beta.9
+  removed all vendor content injection — `inject_adapter_skills()` reads only local plugin skills,
+  and vendor skill dirs are no longer checked out — that guidance was orphaned: the harness never
+  points the model at vendor files. Verified against the live injector and its bats coverage.
+
 ---
 
 ## [0.2.0-beta.10] - 2026-07-31
