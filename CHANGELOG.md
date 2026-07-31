@@ -7,6 +7,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.2.0-beta.10] - 2026-07-31
+
+### Fixed
+
+- **`UserPromptSubmit` hook timeouts under Windows/Git Bash.** `gentle_ai_review_status()`'s
+  internal `gentle-ai review status` call is bounded by `timeout 6` (was `5`) to give it a
+  realistic chance to complete instead of being killed before returning useful data. The plugin
+  hook's own budget in `hooks.json` is raised from `10s` to `15s` to leave headroom for Windows
+  process-spawn overhead on top of that call. Root cause was `gentle-ai` 2.2.1's per-path git
+  subprocess fan-out in `review status`; upgrading to 2.2.4 (git path query batching, review
+  startup no longer materializing the full repository path inventory) cut the call's real-world
+  duration roughly in half, and these timeout values are calibrated against the faster binary.
+
+---
+
 ## [0.2.0-beta.9] - 2026-07-31
 
 ### Fixed

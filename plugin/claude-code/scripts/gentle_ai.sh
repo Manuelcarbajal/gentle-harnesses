@@ -62,7 +62,7 @@ gentle_ai_review_status() {
     bin=$(gentle_ai_bin)
     [ -z "$bin" ] && echo "" && return 1
     local out
-    out=$(timeout 5 "$bin" review status --cwd "$cwd" \
+    out=$(timeout 6 "$bin" review status --cwd "$cwd" \
         --contract gentle-ai.review-integration/v1 \
         --next-transition 2>/dev/null) || { echo ""; return 1; }
     echo "$out"
